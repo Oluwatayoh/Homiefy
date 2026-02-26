@@ -1,9 +1,8 @@
-
 "use client";
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Wallet, BrainCircuit, Target, PlusCircle, UserCircle } from 'lucide-react';
+import { LayoutDashboard, Wallet, BrainCircuit, Target, PlusCircle, UserCircle, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUser } from '@/firebase';
 
@@ -11,7 +10,6 @@ export default function MobileNav() {
   const pathname = usePathname();
   const { user, isUserLoading } = useUser();
 
-  // Do not show the navigation if the user is not logged in or we are still checking auth state
   if (isUserLoading || !user) {
     return null;
   }
@@ -20,7 +18,7 @@ export default function MobileNav() {
     { icon: LayoutDashboard, label: 'Home', href: '/dashboard' },
     { icon: Wallet, label: 'Log', href: '/log' },
     { icon: PlusCircle, label: 'Pre-Spend', href: '/pre-spend', highlight: true },
-    { icon: BrainCircuit, label: 'Habits', href: '/habits' },
+    { icon: Users, label: 'Family', href: '/family' },
     { icon: UserCircle, label: 'Profile', href: '/profile' },
   ];
 

@@ -1,19 +1,51 @@
+'use client';
 
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
 import { FAMILY_DATA, RECENT_TRANSACTIONS } from '@/app/lib/mock-data';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { TrendingUp, AlertCircle, CheckCircle2, MoreHorizontal, Wallet } from 'lucide-react';
+import { TrendingUp, AlertCircle, CheckCircle2, MoreHorizontal, Wallet, Loader2 } from 'lucide-react';
 
 export default function Dashboard() {
+  const { user, isUserLoading } = useUser();
+  const db = useFirestore();
+  const router = useRouter();
+
+  const userDocRef = useMemoFirebase(() => {
+    return user ? doc(db, 'users', user.uid) : null;
+  }, [user, db]);
+
+  const { data: userData, isLoading: isUserDataLoading } = useDoc(userDocRef);
+
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.push('/');
+    } else if (!isUserDataLoading && userData && !userData.familyId) {
+      router.push('/onboarding');
+    }
+  }, [user, isUserLoading, userData, isUserDataLoading, router]);
+
+  if (isUserLoading || isUserDataLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Fallback to mock data for now while integrating real data
   const { name, safeToSpendDaily, healthScores, members, goals } = FAMILY_DATA;
 
   return (
-    <div className="flex flex-col gap-6 p-6 pb-12">
+    <div className="flex flex-col gap-6 p-6 pb-24">
       <header className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold font-headline">{name}</h1>
+          <h1 className="text-2xl font-bold font-headline">{userData?.familyId ? "My Household" : name}</h1>
           <p className="text-muted-foreground text-sm">Family Dashboard</p>
         </div>
         <div className="flex -space-x-2">
@@ -36,7 +68,7 @@ export default function Dashboard() {
             <h2 className="text-5xl font-bold tracking-tight">${safeToSpendDaily.toFixed(2)}</h2>
           </div>
           <p className="text-primary-foreground/70 text-xs mt-4 flex items-center gap-1">
-            <CheckCircle2 className="w-3 h-3" /> All goals on track for {name}
+            <CheckCircle2 className="w-3 h-3" /> All goals on track
           </p>
         </CardContent>
       </Card>
