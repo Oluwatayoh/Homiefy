@@ -7,8 +7,7 @@ service cloud.firestore {
      * 
      * CORE PHILOSOPHY:
      * 1. Path-based isolation for User Profiles.
-     * 2. Parent-based membership isolation for Family data.
-     * 3. Simplified listing rules to avoid complex query/filter mismatches.
+     * 2. Denormalized membership for all family data to satisfy "Rules are not filters".
      */
 
     // --- GLOBAL HELPER FUNCTIONS ---
@@ -21,10 +20,9 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Checks if the user is a member of a family document by looking up the document's members map.
-    function isMemberOfFamily(familyId) {
-      return isSignedIn() && 
-             get(/databases/$(database)/documents/families/$(familyId)).data.members[request.auth.uid] != null;
+    // High-performance check for list operations using denormalized membership map.
+    function hasMembership(data) {
+      return isSignedIn() && data.members[request.auth.uid] != null;
     }
 
     // --- COLLECTION RULES ---
@@ -33,32 +31,27 @@ service cloud.firestore {
      * @description Rules for individual user profiles.
      */
     match /userProfiles/{userId} {
-      allow get, list: if isOwner(userId);
-      allow create, update: if isOwner(userId);
-      allow delete: if isOwner(userId);
+      allow read, write: if isOwner(userId);
     }
 
     /**
      * @description Rules for family units and their shared data.
      */
     match /families/{familyId} {
-      // Allow signed-in users to get and list families (critical for joining via invite code)
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
+      // Allow signed-in users to get and list families (for joining)
+      allow get, list: if isSignedIn();
       
-      // Only the creator can create the family.
-      allow create: if isSignedIn() && request.resource.data.adminUserId == request.auth.uid;
-      
-      // Updates and deletes are restricted to members or admins.
-      allow update: if isMemberOfFamily(familyId);
-      allow delete: if isSignedIn() && get(/databases/$(database)/documents/families/$(familyId)).data.members[request.auth.uid] == 'Admin';
+      // Creation and updates based on membership/admin roles.
+      allow create: if isSignedIn();
+      allow update: if hasMembership(resource.data);
+      allow delete: if isSignedIn() && resource.data.members[request.auth.uid] == 'Admin';
 
       /**
        * @description Rules for family sub-data (Budgets, Goals, Transactions, Approvals, Decisions).
-       * We use a parent-check for consistent access control across all family data.
+       * Every document MUST contain a 'members' map for this high-performance check.
        */
       match /{allSubcollections=**} {
-        allow list, get, create, update, delete: if isMemberOfFamily(familyId);
+        allow read, write: if hasMembership(resource.data) || hasMembership(request.resource.data);
       }
     }
   }

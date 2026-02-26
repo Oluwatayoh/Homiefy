@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
-import { doc, collection, query, orderBy, deleteDoc } from 'firebase/firestore';
+import { doc, collection, query, orderBy, deleteDoc, where } from 'firebase/firestore';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,13 +35,15 @@ export default function TransactionHistory() {
 
   const { data: userData, isLoading: isUserDataLoading } = useDoc(userDocRef);
 
+  // Synchronized query with membership filter to satisfy firestore.rules
   const txQuery = useMemoFirebase(() => {
-    if (isUserDataLoading || !userData?.familyId) return null;
+    if (isUserDataLoading || !userData?.familyId || !user?.uid) return null;
     return query(
       collection(db, 'families', userData.familyId, 'transactions'),
+      where(`members.${user.uid}`, '!=', null),
       orderBy('date', sortOrder)
     );
-  }, [userData?.familyId, isUserDataLoading, db, sortOrder]);
+  }, [userData?.familyId, user?.uid, isUserDataLoading, db, sortOrder]);
 
   const { data: transactions, isLoading } = useCollection(txQuery);
 

@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { 
-  TrendingUp, CheckCircle2, MoreHorizontal, Wallet, Loader2, AlertCircle, 
+  TrendingUp, CheckCircle2, Wallet, Loader2, AlertCircle, 
   AlertTriangle, ArrowRight, History, Plus, ShieldCheck, XCircle, 
   BrainCircuit, PieChart, Target, Sparkles, Activity, PlusCircle
 } from 'lucide-react';
@@ -61,36 +61,40 @@ export default function Dashboard() {
 
   const isStaff = userData?.role === 'Admin' || userData?.role === 'Co-Manager';
 
+  // Explicit membership filters to satisfy firestore.rules
   const txQuery = useMemoFirebase(() => {
-    if (isUserDataLoading || !userData?.familyId) return null;
+    if (isUserDataLoading || !userData?.familyId || !user?.uid) return null;
     return query(
       collection(db, 'families', userData.familyId, 'transactions'),
+      where(`members.${user.uid}`, '!=', null),
       orderBy('date', 'desc'),
       limit(5)
     );
-  }, [userData?.familyId, isUserDataLoading, db]);
+  }, [userData?.familyId, user?.uid, isUserDataLoading, db]);
 
   const { data: recentTxs, isLoading: isTxsLoading } = useCollection(txQuery);
 
   const goalsQuery = useMemoFirebase(() => {
-    if (isUserDataLoading || !userData?.familyId) return null;
+    if (isUserDataLoading || !userData?.familyId || !user?.uid) return null;
     return query(
       collection(db, 'families', userData.familyId, 'goals'),
+      where(`members.${user.uid}`, '!=', null),
       orderBy('createdAt', 'desc'),
       limit(3)
     );
-  }, [userData?.familyId, isUserDataLoading, db]);
+  }, [userData?.familyId, user?.uid, isUserDataLoading, db]);
 
   const { data: goalsData, isLoading: isGoalsLoading } = useCollection(goalsQuery);
 
   const decisionsQuery = useMemoFirebase(() => {
-    if (isUserDataLoading || !userData?.familyId) return null;
+    if (isUserDataLoading || !userData?.familyId || !user?.uid) return null;
     return query(
       collection(db, 'families', userData.familyId, 'decisions'),
+      where(`members.${user.uid}`, '!=', null),
       orderBy('timestamp', 'desc'),
       limit(10)
     );
-  }, [userData?.familyId, isUserDataLoading, db]);
+  }, [userData?.familyId, user?.uid, isUserDataLoading, db]);
 
   const { data: recentDecisions } = useCollection(decisionsQuery);
 
@@ -98,16 +102,19 @@ export default function Dashboard() {
     if (isUserDataLoading || !userData?.familyId || !user?.uid) return null;
     
     const baseCol = collection(db, 'families', userData.familyId, 'approvals');
+    const membershipFilter = where(`members.${user.uid}`, '!=', null);
     
     if (isStaff) {
       return query(
         baseCol,
+        membershipFilter,
         where('status', '==', 'Pending'),
         orderBy('requestedAt', 'desc')
       );
     } else {
       return query(
         baseCol,
+        membershipFilter,
         where('requesterId', '==', user.uid),
         where('status', '==', 'Pending'),
         orderBy('requestedAt', 'desc')

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, addDoc, doc } from 'firebase/firestore';
+import { collection, query, orderBy, addDoc, doc, updateDoc, where } from 'firebase/firestore';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Target, Calendar, TrendingUp, Plus, Loader2, Sparkles, Goal as GoalIcon, PlusCircle } from 'lucide-react';
+import { Target, Calendar, TrendingUp, Plus, Loader2, Sparkles, Goal as GoalIcon, PlusCircle, PiggyBank } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function GoalsPage() {
@@ -22,6 +22,8 @@ export default function GoalsPage() {
 
   const [mounted, setMounted] = useState(false);
   const [showAddGoal, setShowAddGoal] = useState(false);
+  const [showContribute, setShowContribute] = useState<any | null>(null);
+  const [contributionAmount, setContributionAmount] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [newGoal, setNewGoal] = useState({
@@ -47,13 +49,15 @@ export default function GoalsPage() {
 
   const { data: familyData } = useDoc(familyDocRef);
 
+  // Synchronized query with membership filter to satisfy firestore.rules
   const goalsQuery = useMemoFirebase(() => {
-    if (isUserDataLoading || !userData?.familyId) return null;
+    if (isUserDataLoading || !userData?.familyId || !user?.uid) return null;
     return query(
       collection(db, 'families', userData.familyId, 'goals'),
+      where(`members.${user.uid}`, '!=', null),
       orderBy('createdAt', 'desc')
     );
-  }, [userData?.familyId, isUserDataLoading, db]);
+  }, [userData?.familyId, user?.uid, isUserDataLoading, db]);
 
   const { data: goals, isLoading } = useCollection(goalsQuery);
 
@@ -65,7 +69,7 @@ export default function GoalsPage() {
         ...newGoal,
         targetAmount: parseFloat(newGoal.targetAmount),
         currentAmount: 0,
-        members: familyData.members,
+        members: familyData.members, // Denormalize membership for rules
         userId: user.uid,
         createdAt: new Date().toISOString()
       });
@@ -74,6 +78,28 @@ export default function GoalsPage() {
       setNewGoal({ name: '', targetAmount: '', deadline: '', priority: 'Medium' });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleContribute = async () => {
+    if (!userData?.familyId || !showContribute || !contributionAmount) return;
+    setIsSubmitting(true);
+    try {
+      const goalRef = doc(db, 'families', userData.familyId, 'goals', showContribute.id);
+      const newAmount = (showContribute.currentAmount || 0) + parseFloat(contributionAmount);
+      
+      await updateDoc(goalRef, {
+        currentAmount: newAmount,
+        updatedAt: new Date().toISOString()
+      });
+
+      toast({ title: "Contribution Added", description: `You added $${contributionAmount} to ${showContribute.name}!` });
+      setShowContribute(null);
+      setContributionAmount('');
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Contribution Failed", description: e.message });
     } finally {
       setIsSubmitting(false);
     }
@@ -120,16 +146,24 @@ export default function GoalsPage() {
                       Target: {goal.deadline ? new Date(goal.deadline).toLocaleDateString() : 'No deadline'}
                     </div>
                     
-                    <div className="mt-8 mb-2">
+                    <div className="mt-8 mb-4">
                       <div className="flex justify-between text-sm font-bold mb-2">
                         <span>${goal.currentAmount.toLocaleString()}</span>
                         <span className="text-muted-foreground">${goal.targetAmount.toLocaleString()}</span>
                       </div>
                       <Progress value={percent} className="h-3 bg-secondary" />
                     </div>
+
+                    <Button 
+                      variant="secondary" 
+                      className="w-full rounded-xl font-bold gap-2 mb-4"
+                      onClick={() => setShowContribute(goal)}
+                    >
+                      <PiggyBank className="h-4 w-4" /> Add Funds
+                    </Button>
                   </div>
                   
-                  <div className="bg-secondary/30 p-4 mt-6 flex justify-around">
+                  <div className="bg-secondary/30 p-4 mt-2 flex justify-around">
                      <div className="text-center">
                        <p className="text-[10px] uppercase font-bold text-muted-foreground">Priority</p>
                        <p className="font-bold text-primary">{goal.priority}</p>
@@ -137,7 +171,7 @@ export default function GoalsPage() {
                      <div className="w-px bg-border h-full" />
                      <div className="text-center">
                        <p className="text-[10px] uppercase font-bold text-muted-foreground">Remaining</p>
-                       <p className="font-bold text-primary">${(goal.targetAmount - goal.currentAmount).toLocaleString()}</p>
+                       <p className="font-bold text-primary">${Math.max(0, goal.targetAmount - goal.currentAmount).toLocaleString()}</p>
                      </div>
                   </div>
                 </CardContent>
@@ -162,28 +196,11 @@ export default function GoalsPage() {
         )}
       </div>
 
-      {!isLoading && goals && goals.length > 0 && (
-        <section className="mt-4">
-           <h3 className="font-semibold mb-3">Goal Insights</h3>
-           <div className="p-4 rounded-2xl bg-white shadow-sm flex items-start gap-4">
-             <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-               <TrendingUp className="text-green-600 h-5 w-5" />
-             </div>
-             <div>
-               <p className="text-sm font-bold">Stay disciplined!</p>
-               <p className="text-xs text-muted-foreground">Contributing consistently each month is the fastest way to reach your family dreams.</p>
-             </div>
-           </div>
-        </section>
-      )}
-
       <Dialog open={showAddGoal} onOpenChange={setShowAddGoal}>
         <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle>New Family Goal</DialogTitle>
-            <DialogDescription>
-              Set a target for your family's financial future.
-            </DialogDescription>
+            <DialogDescription>Set a target for your family's financial future.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-1">
@@ -220,6 +237,36 @@ export default function GoalsPage() {
             <Button onClick={handleAddGoal} disabled={isSubmitting || !newGoal.name || !newGoal.targetAmount} className="rounded-xl bg-accent">
               {isSubmitting ? <Loader2 className="animate-spin h-4 w-4" /> : <Sparkles className="h-4 w-4 mr-2" />}
               Create Goal
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!showContribute} onOpenChange={(open) => !open && setShowContribute(null)}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Contribute Funds</DialogTitle>
+            <DialogDescription>Adding savings to "{showContribute?.name}"</DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase text-muted-foreground">Amount to save</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-lg">$</span>
+                <Input 
+                  type="number" 
+                  placeholder="0.00" 
+                  className="pl-8 h-12 text-xl font-bold rounded-xl"
+                  value={contributionAmount}
+                  onChange={(e) => setContributionAmount(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowContribute(null)} className="rounded-xl">Cancel</Button>
+            <Button onClick={handleContribute} disabled={isSubmitting || !contributionAmount} className="rounded-xl bg-primary">
+              {isSubmitting ? <Loader2 className="animate-spin h-4 w-4" /> : "Confirm Contribution"}
             </Button>
           </DialogFooter>
         </DialogContent>

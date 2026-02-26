@@ -146,7 +146,7 @@ export default function BudgetManagement() {
         totalIncome: parseFloat(income),
         envelopes: envelopes,
         status: 'Active',
-        members: familyData.members, // Denormalize membership for security rules
+        members: familyData.members, // Denormalize membership for rules
         updatedAt: new Date().toISOString()
       };
 
