@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -11,9 +10,15 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { TrendingUp, CheckCircle2, MoreHorizontal, Wallet, Loader2, AlertCircle, AlertTriangle, ArrowRight, History, Plus, ShieldCheck, XCircle } from 'lucide-react';
+import { 
+  TrendingUp, CheckCircle2, MoreHorizontal, Wallet, Loader2, AlertCircle, 
+  AlertTriangle, ArrowRight, History, Plus, ShieldCheck, XCircle, 
+  BrainCircuit, PieChart, Target, Sparkles, Activity
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { Pie, PieChart as RePieChart, Cell, ResponsiveContainer } from 'recharts';
 
 export default function Dashboard() {
   const { user, isUserLoading } = useUser();
@@ -24,6 +29,7 @@ export default function Dashboard() {
   const [mounted, setMounted] = useState(false);
   const [selectedApproval, setSelectedApproval] = useState<any | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showScoreBreakdown, setShowScoreBreakdown] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -57,11 +63,32 @@ export default function Dashboard() {
 
   const { data: recentTxs, isLoading: isTxsLoading } = useCollection(txQuery);
 
+  const goalsQuery = useMemoFirebase(() => {
+    if (!userData?.familyId) return null;
+    return query(
+      collection(db, 'families', userData.familyId, 'goals'),
+      orderBy('createdAt', 'desc'),
+      limit(3)
+    );
+  }, [userData?.familyId, db]);
+
+  const { data: goalsData } = useCollection(goalsQuery);
+
+  const decisionsQuery = useMemoFirebase(() => {
+    if (!userData?.familyId) return null;
+    return query(
+      collection(db, 'families', userData.familyId, 'decisions'),
+      orderBy('timestamp', 'desc'),
+      limit(10)
+    );
+  }, [userData?.familyId, db]);
+
+  const { data: recentDecisions } = useCollection(decisionsQuery);
+
   const isStaff = userData?.role === 'Admin' || userData?.role === 'Co-Manager';
 
   const approvalsQuery = useMemoFirebase(() => {
     if (!userData?.familyId) return null;
-    // If Admin/Co-Manager, see all Pending. If Member, see own Pending.
     if (isStaff) {
       return query(
         collection(db, 'families', userData.familyId, 'approvals'),
@@ -81,7 +108,15 @@ export default function Dashboard() {
   const { data: pendingApprovals } = useCollection(approvalsQuery);
 
   const stsData = useMemo(() => {
-    if (!budgetData || !mounted) return { amount: 0, status: 'neutral', percentSpent: 0, alerts: [] };
+    if (!budgetData || !mounted) return { 
+      amount: 0, 
+      status: 'neutral', 
+      percentSpent: 0, 
+      alerts: [], 
+      totalAllocated: 0, 
+      totalSpent: 0,
+      pieData: []
+    };
 
     const totalAllocated = budgetData.envelopes?.reduce((sum: number, e: any) => sum + (e.allocated || 0), 0) || 0;
     const totalSpent = budgetData.envelopes?.reduce((sum: number, e: any) => sum + (e.spent || 0), 0) || 0;
@@ -95,6 +130,14 @@ export default function Dashboard() {
     const amount = Math.max(0, remainingBudget / daysLeft);
     const percentSpent = totalAllocated > 0 ? (totalSpent / totalAllocated) * 100 : 0;
 
+    const pieData = (budgetData.envelopes || [])
+      .filter((e: any) => e.spent > 0)
+      .map((e: any, i: number) => ({
+        name: e.name,
+        value: e.spent,
+        fill: `hsl(var(--chart-${(i % 5) + 1}))`
+      }));
+
     const alerts = (budgetData.envelopes || [])
       .filter((e: any) => (e.spent / (e.allocated || 1)) >= 0.8)
       .map((e: any) => ({
@@ -106,8 +149,36 @@ export default function Dashboard() {
     if (remainingBudget <= 0) status = 'red';
     else if (percentSpent > 80) status = 'yellow';
 
-    return { amount, status, percentSpent, totalAllocated, totalSpent, alerts };
-  }, [budgetData, mounted]);
+    // FR7.3 Health Score Calculation
+    // Adherence (40): 40 * (1 - overflow_ratio)
+    const adherenceScore = Math.max(0, 40 * (1 - (totalSpent > totalAllocated ? (totalSpent - totalAllocated) / totalAllocated : 0)));
+    // Savings Rate (30): Simplified as 30 * (1 - spending_ratio) if income is known
+    const spendingRatio = budgetData.totalIncome > 0 ? totalSpent / budgetData.totalIncome : 1;
+    const savingsScore = Math.max(0, 30 * (1 - spendingRatio));
+    // Goal Progress (20): Average progress of top goals
+    const goalScore = goalsData?.length 
+      ? (goalsData.reduce((sum, g) => sum + (g.currentAmount / g.targetAmount), 0) / goalsData.length) * 20
+      : 0;
+    // Impulse Control (10): 10 * (1 - impulse_ratio) based on decisions
+    const impulseRatio = recentDecisions?.length 
+      ? recentDecisions.filter(d => d.userAction === 'proceeded' && d.aiAnalysis.regretScore > 50).length / recentDecisions.length
+      : 0;
+    const impulseScore = 10 * (1 - impulseRatio);
+
+    const totalHealthScore = Math.round(adherenceScore + savingsScore + goalScore + impulseScore);
+
+    return { 
+      amount, 
+      status, 
+      percentSpent, 
+      totalAllocated, 
+      totalSpent, 
+      alerts, 
+      pieData,
+      totalHealthScore,
+      breakdown: { adherenceScore, savingsScore, goalScore, impulseScore }
+    };
+  }, [budgetData, mounted, goalsData, recentDecisions]);
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -130,7 +201,6 @@ export default function Dashboard() {
       });
 
       if (status === 'Approved') {
-        // Log the actual transaction
         const txRef = doc(collection(db, 'families', userData.familyId, 'transactions'));
         const txData = {
           ...selectedApproval.transactionData,
@@ -142,7 +212,6 @@ export default function Dashboard() {
         };
         await setDoc(txRef, txData);
 
-        // Update budget envelope
         if (budgetDocRef && budgetData) {
           const updatedEnvelopes = budgetData.envelopes.map((e: any) => 
             e.name === selectedApproval.transactionData.category 
@@ -181,7 +250,7 @@ export default function Dashboard() {
           <p className="text-muted-foreground text-sm">Family Dashboard</p>
         </div>
         <div className="flex -space-x-2">
-          <Avatar className="border-2 border-background w-8 h-8">
+          <Avatar className="border-2 border-background w-8 h-8 cursor-pointer" onClick={() => router.push('/profile')}>
             <AvatarFallback className="text-[10px] bg-secondary text-primary font-bold">
               {user?.displayName?.[0] || 'U'}
             </AvatarFallback>
@@ -189,6 +258,7 @@ export default function Dashboard() {
         </div>
       </header>
 
+      {/* Safe to Spend Widget (FR7.1.1) */}
       <Card className={cn(
         "text-white border-none shadow-xl overflow-hidden relative transition-colors duration-500",
         stsData.status === 'green' ? "bg-emerald-600" : 
@@ -222,9 +292,80 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* Pending Approvals Section (Module 6) */}
+      {/* Health Score Gauge (FR7.1.2) */}
+      <Card className="border-none shadow-sm bg-white overflow-hidden cursor-pointer hover:bg-secondary/5 transition-colors" onClick={() => setShowScoreBreakdown(true)}>
+        <CardContent className="p-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="relative w-16 h-16 flex items-center justify-center">
+              <ResponsiveContainer width="100%" height="100%">
+                <RePieChart>
+                  <Pie
+                    data={[
+                      { value: stsData.totalHealthScore },
+                      { value: 100 - stsData.totalHealthScore }
+                    ]}
+                    innerRadius={24}
+                    outerRadius={30}
+                    startAngle={90}
+                    endAngle={-270}
+                    dataKey="value"
+                    stroke="none"
+                  >
+                    <Cell fill="hsl(var(--primary))" />
+                    <Cell fill="hsl(var(--secondary))" />
+                  </Pie>
+                </RePieChart>
+              </ResponsiveContainer>
+              <span className="absolute font-bold text-xs">{stsData.totalHealthScore}</span>
+            </div>
+            <div>
+              <h3 className="text-sm font-bold">Budget Health Score</h3>
+              <p className="text-[10px] text-muted-foreground">Tap to see behavioral breakdown</p>
+            </div>
+          </div>
+          <Sparkles className="h-5 w-5 text-accent animate-pulse" />
+        </CardContent>
+      </Card>
+
+      {/* Spending Visualization (FR7.2) */}
+      {stsData.pieData.length > 0 && (
+        <section>
+          <div className="flex items-center justify-between mb-3 px-1">
+            <h3 className="font-semibold flex items-center gap-2">
+              <PieChart className="h-4 w-4 text-primary" /> Spending Mix
+            </h3>
+          </div>
+          <Card className="border-none bg-white shadow-sm p-4 h-[240px] flex items-center justify-center">
+             <ChartContainer 
+              config={Object.fromEntries(stsData.pieData.map(d => [d.name, { label: d.name, color: d.fill }]))}
+              className="w-full h-full"
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <RePieChart>
+                  <Pie
+                    data={stsData.pieData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                  >
+                    {stsData.pieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                  <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+                </RePieChart>
+              </ResponsiveContainer>
+            </ChartContainer>
+          </Card>
+        </section>
+      )}
+
+      {/* Pending Approvals */}
       {pendingApprovals && pendingApprovals.length > 0 && (
-        <section className="animate-in fade-in slide-in-from-top-4 duration-500">
+        <section>
           <div className="flex items-center justify-between mb-3 px-1">
             <h3 className="font-semibold flex items-center gap-2">
               <ShieldCheck className="h-4 w-4 text-primary" /> 
@@ -257,6 +398,34 @@ export default function Dashboard() {
         </section>
       )}
 
+      {/* Goal Progress (FR7.1.5) */}
+      {goalsData && goalsData.length > 0 && (
+        <section>
+          <div className="flex items-center justify-between mb-3 px-1">
+            <h3 className="font-semibold flex items-center gap-2">
+              <Target className="h-4 w-4 text-primary" /> Active Goals
+            </h3>
+            <Button variant="ghost" size="sm" onClick={() => router.push('/goals')} className="text-xs h-8">View All</Button>
+          </div>
+          <div className="space-y-3">
+            {goalsData.map((goal) => {
+              const percent = Math.min(100, (goal.currentAmount / goal.targetAmount) * 100);
+              return (
+                <Card key={goal.id} className="border-none bg-white shadow-sm p-4 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-bold">{goal.name}</span>
+                    <span className="text-[10px] font-bold text-primary">{Math.round(percent)}%</span>
+                  </div>
+                  <Progress value={percent} className="h-1.5" />
+                  <p className="text-[8px] text-muted-foreground text-right">Target: ${goal.targetAmount.toLocaleString()}</p>
+                </Card>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* Recent Activity */}
       <section>
         <div className="flex items-center justify-between mb-3 px-1">
           <h3 className="font-semibold">Recent Activity</h3>
@@ -266,7 +435,7 @@ export default function Dashboard() {
         </div>
         <div className="space-y-2">
           {recentTxs?.map((tx) => (
-            <Card key={tx.id} className="border-none bg-white shadow-sm overflow-hidden">
+            <Card key={tx.id} className="border-none bg-white shadow-sm overflow-hidden" onClick={() => router.push(`/transactions?id=${tx.id}`)}>
               <CardContent className="p-3 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center text-primary">
@@ -284,65 +453,82 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           ))}
-          {(!recentTxs || recentTxs.length === 0) && !isTxsLoading && (
-            <div className="text-center p-8 bg-white rounded-xl border-2 border-dashed border-muted text-xs text-muted-foreground">
-              No transactions yet.
-            </div>
-          )}
         </div>
       </section>
 
-      <section>
-        <div className="flex items-center justify-between mb-3 px-1">
-          <h3 className="font-semibold">Budget Progress</h3>
-          <Badge variant="outline" className="text-[10px] font-bold">MONTHLY</Badge>
-        </div>
-        <Card className="border-none bg-white shadow-sm overflow-hidden">
-          <CardContent className="p-4 space-y-4">
-            <div className="flex justify-between items-center">
-              <span className="text-xs font-bold text-muted-foreground uppercase">Usage</span>
-              <span className="text-sm font-bold">{Math.round(stsData.percentSpent)}%</span>
-            </div>
-            <Progress value={stsData.percentSpent} className={cn(
-              "h-2 bg-secondary",
-              stsData.percentSpent >= 100 ? "[&>div]:bg-red-500" : stsData.percentSpent >= 80 ? "[&>div]:bg-amber-500" : ""
-            )} />
-            <div className="grid grid-cols-2 gap-4 pt-2">
-              <div className="p-3 rounded-xl bg-secondary/30">
-                <p className="text-muted-foreground text-[10px] uppercase font-bold tracking-wider mb-1">Spent</p>
-                <p className="text-lg font-bold">${stsData.totalSpent?.toFixed(0)}</p>
-              </div>
-              <div className="p-3 rounded-xl bg-secondary/30">
-                <p className="text-muted-foreground text-[10px] uppercase font-bold tracking-wider mb-1">Budget</p>
-                <p className="text-lg font-bold">${stsData.totalAllocated?.toFixed(0)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-
+      {/* Quick Actions */}
       <div className="grid grid-cols-2 gap-4 mt-2">
         <button 
           onClick={() => router.push('/log')}
-          className="p-4 rounded-2xl bg-white shadow-sm border border-transparent hover:border-primary transition-all text-left"
+          className="p-4 rounded-2xl bg-white shadow-sm border border-transparent hover:border-primary transition-all text-left group"
         >
-          <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center mb-3">
-            <Plus className="h-5 w-5" />
+          <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center mb-3 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+            <Plus className="h-6 w-6" />
           </div>
           <p className="font-bold text-sm">Rapid Log</p>
           <p className="text-[10px] text-muted-foreground">Quick entry</p>
         </button>
         <button 
           onClick={() => router.push('/pre-spend')}
-          className="p-4 rounded-2xl bg-white shadow-sm border border-transparent hover:border-accent transition-all text-left"
+          className="p-4 rounded-2xl bg-white shadow-sm border border-transparent hover:border-accent transition-all text-left group"
         >
-          <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center mb-3">
-            <Wallet className="h-5 w-5" />
+          <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center mb-3 group-hover:bg-amber-600 group-hover:text-white transition-colors">
+            <Sparkles className="h-6 w-6" />
           </div>
           <p className="font-bold text-sm">Pre-Spend</p>
-          <p className="text-[10px] text-muted-foreground">Decision check</p>
+          <p className="text-[10px] text-muted-foreground">AI Intel</p>
         </button>
       </div>
+
+      {/* Health Score Breakdown Modal (FR7.3) */}
+      <Dialog open={showScoreBreakdown} onOpenChange={setShowScoreBreakdown}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-primary" />
+              Behavioral Breakdown
+            </DialogTitle>
+            <DialogDescription>
+              Your score is a weighted average of your family's financial habits.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6 pt-4">
+            <div className="text-center pb-4">
+              <p className="text-5xl font-bold text-primary">{stsData.totalHealthScore}</p>
+              <p className="text-xs font-bold uppercase text-muted-foreground mt-2">Overall Score</p>
+            </div>
+
+            <div className="space-y-4">
+              {[
+                { label: 'Budget Adherence', score: stsData.breakdown.adherenceScore, max: 40, desc: 'How well you stay within envelopes.' },
+                { label: 'Savings Rate', score: stsData.breakdown.savingsScore, max: 30, desc: 'Unspent income from this month.' },
+                { label: 'Goal Progress', score: stsData.breakdown.goalScore, max: 20, desc: 'Contributions to family savings goals.' },
+                { label: 'Impulse Control', score: stsData.breakdown.impulseScore, max: 10, desc: 'Actions taken after AI pre-spend analysis.' },
+              ].map((item) => (
+                <div key={item.label} className="space-y-1">
+                  <div className="flex justify-between items-end">
+                    <span className="text-xs font-bold">{item.label}</span>
+                    <span className="text-[10px] font-bold text-muted-foreground">{Math.round(item.score)}/{item.max}</span>
+                  </div>
+                  <Progress value={(item.score / item.max) * 100} className="h-1.5" />
+                  <p className="text-[9px] text-muted-foreground italic">{item.desc}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="p-4 rounded-xl bg-primary/5 border border-primary/10">
+              <p className="text-xs font-bold text-primary flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" /> Coaching Tip
+              </p>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                {stsData.totalHealthScore > 80 
+                  ? "Outstanding! Your family is demonstrating elite financial discipline." 
+                  : "Try checking 'Decision Intel' before discretionary spending to boost your Impulse Control score."}
+              </p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Approval Decision Modal */}
       <Dialog open={!!selectedApproval} onOpenChange={(open) => !open && setSelectedApproval(null)}>

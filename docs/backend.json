@@ -1,4 +1,3 @@
-
 {
   "entities": {
     "User": {
@@ -137,6 +136,21 @@
         "resolvedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["familyId", "requesterId", "transactionData", "status", "requestedAt"]
+    },
+    "Goal": {
+      "title": "Goal",
+      "type": "object",
+      "description": "A family financial goal.",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "targetAmount": { "type": "number" },
+        "currentAmount": { "type": "number" },
+        "deadline": { "type": "string", "format": "date-time" },
+        "priority": { "type": "string", "enum": ["High", "Medium", "Low"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "targetAmount", "currentAmount", "deadline"]
     }
   },
   "auth": {
@@ -190,6 +204,14 @@
           "entityName": "Approval",
           "schema": { "$ref": "#/backend/entities/Approval" },
           "description": "Spending approval requests."
+        }
+      },
+      {
+        "path": "/families/{familyId}/goals/{goalId}",
+        "definition": {
+          "entityName": "Goal",
+          "schema": { "$ref": "#/backend/entities/Goal" },
+          "description": "Family financial goals."
         }
       }
     ]
