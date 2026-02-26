@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useUser, useAuth, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { LogOut, User, Settings, Bell, Shield, ChevronRight, Loader2, Save } from 'lucide-react';
+import { LogOut, User, Settings, Bell, Shield, ChevronRight, Loader2, Save, Camera, Upload, X } from 'lucide-react';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from '@/hooks/use-toast';
@@ -22,6 +21,8 @@ export default function ProfilePage() {
   const router = useRouter();
   const { toast } = useToast();
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const userDocRef = useMemoFirebase(() => {
     return user ? doc(db, 'users', user.uid) : null;
   }, [user, db]);
@@ -30,15 +31,34 @@ export default function ProfilePage() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [editName, setEditName] = useState('');
-  const [editPhotoUrl, setEditPhotoUrl] = useState('');
+  const [editPhoto, setEditPhoto] = useState<string | null>(null);
 
-  // Initialize edit states when userData is available
   useEffect(() => {
     if (userData) {
       setEditName(userData.name || '');
-      setEditPhotoUrl(userData.photoUrl || '');
+      setEditPhoto(userData.photoUrl || null);
     }
   }, [userData]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 1024 * 1024) { // 1MB limit for base64 storage
+        toast({
+          variant: "destructive",
+          title: "File too large",
+          description: "Please select an image smaller than 1MB."
+        });
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setEditPhoto(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSaveProfile = async () => {
     if (!user || !userDocRef) return;
@@ -46,8 +66,8 @@ export default function ProfilePage() {
     try {
       await setDoc(userDocRef, {
         name: editName,
-        photoUrl: editPhotoUrl,
-        lastLogin: serverTimestamp() // Update last interaction
+        photoUrl: editPhoto,
+        lastLogin: serverTimestamp()
       }, { merge: true });
       
       toast({ 
@@ -93,12 +113,20 @@ export default function ProfilePage() {
       <Card className="border-none shadow-xl bg-white overflow-hidden">
         <CardContent className="p-6">
           <div className="flex items-center gap-4 mb-6">
-            <Avatar className="h-16 w-16 border-2 border-primary/20">
-              <AvatarImage src={userData?.photoUrl || user.photoURL || ''} />
-              <AvatarFallback className="bg-primary/10 text-primary font-bold text-xl">
-                {userData?.name?.[0] || user.displayName?.[0] || 'U'}
-              </AvatarFallback>
-            </Avatar>
+            <div className="relative group">
+              <Avatar className="h-16 w-16 border-2 border-primary/20">
+                <AvatarImage src={editPhoto || userData?.photoUrl || user.photoURL || ''} />
+                <AvatarFallback className="bg-primary/10 text-primary font-bold text-xl">
+                  {userData?.name?.[0] || user.displayName?.[0] || 'U'}
+                </AvatarFallback>
+              </Avatar>
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="absolute inset-0 flex items-center justify-center bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <Camera className="h-5 w-5" />
+              </button>
+            </div>
             <div className="flex-1">
               <h3 className="text-xl font-bold">{userData?.name || user.displayName}</h3>
               <p className="text-sm text-muted-foreground">{user.email}</p>
@@ -133,16 +161,41 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="photo" className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">Profile Picture URL</Label>
-                  <Input 
-                    id="photo"
-                    value={editPhotoUrl} 
-                    onChange={(e) => setEditPhotoUrl(e.target.value)}
-                    placeholder="https://example.com/image.jpg"
-                    className="rounded-xl h-11 bg-white"
-                  />
-                  {!editPhotoUrl && <p className="text-[9px] text-amber-600 font-bold italic">Missing: Please add a photo link.</p>}
-                  <p className="text-[9px] text-muted-foreground italic">Provide a link to an image file (JPG, PNG).</p>
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">Profile Photo</Label>
+                  <div className="flex flex-col gap-3">
+                    <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      className="hidden" 
+                      accept="image/*"
+                      onChange={handleFileChange}
+                    />
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="rounded-xl flex-1 gap-2 bg-white"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <Upload className="h-4 w-4" /> Upload New Photo
+                      </Button>
+                      {editPhoto && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="rounded-xl text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => setEditPhoto(null)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    {editPhoto ? (
+                      <p className="text-[9px] text-emerald-600 font-bold italic">New photo selected (unsaved).</p>
+                    ) : (
+                      !userData?.photoUrl && <p className="text-[9px] text-amber-600 font-bold italic">Missing: Please upload a photo.</p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-2">
