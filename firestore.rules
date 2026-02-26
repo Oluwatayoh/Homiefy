@@ -8,8 +8,7 @@ service cloud.firestore {
      * CORE PHILOSOPHY:
      * 1. Path-based isolation for User Profiles.
      * 2. Parent-document membership check for family sub-data.
-     * 3. Authorization Independence: Every document contains its own access control map (members)
-     *    to support high-performance list operations without parent joins.
+     * 3. Membership is stored as a map on the Family document: members: { uid: role }
      */
 
     function isSignedIn() {
@@ -20,7 +19,7 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // High-performance check for family membership by checking the parent Family document.
+    // Checks if the user is a member of the family by looking at the parent Family document.
     function isFamilyMember(familyId) {
       return isSignedIn() && 
         exists(/databases/$(database)/documents/families/$(familyId)) &&
@@ -34,6 +33,7 @@ service cloud.firestore {
      */
     match /userProfiles/{userId} {
       // Allow reading if it's the owner OR if the requester is in the same family.
+      // This is critical for showing names in the family roster.
       allow read: if isOwner(userId) || (
         isSignedIn() && 
         resource.data.familyId != null && 
@@ -46,22 +46,22 @@ service cloud.firestore {
      * @description Rules for family units and their shared data.
      */
     match /families/{familyId} {
-      // Allow signed-in users to get/list families (necessary for joining)
+      // Allow signed-in users to get/list families (necessary for joining via code)
       allow get, list: if isSignedIn();
       
       // Creation.
       allow create: if isSignedIn();
       
       // Update logic:
-      // 1. Existing members can update (governed by role logic in app).
-      // 2. New members can join by adding their UID to the members map.
+      // 1. Existing members can update.
+      // 2. New members can join by adding their own UID to the members map.
       allow update: if isSignedIn() && (
         isFamilyMember(familyId) || 
         (
           // Case: Joining a family
-          // Ensure they only add themselves as a 'Member'
+          // Ensure they only add THEMSELVES as a 'Member'
           request.resource.data.members[request.auth.uid] == 'Member' &&
-          // Ensure they don't modify critical fields during the join
+          // Ensure they don't modify critical identifying fields during the join
           request.resource.data.inviteCode == resource.data.inviteCode &&
           request.resource.data.name == resource.data.name
         )
@@ -70,7 +70,7 @@ service cloud.firestore {
       allow delete: if isSignedIn() && get(/databases/$(database)/documents/families/$(familyId)).data.members[request.auth.uid] == 'Admin';
 
       /**
-       * @description Rules for family sub-data (Transactions, Budgets, Goals, etc.)
+       * @description Rules for family sub-data (Transactions, Budgets, Goals, Approvals, Decisions)
        * These allow access if the user is a member of the parent family.
        */
       match /{allSubcollections=**} {

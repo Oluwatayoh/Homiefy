@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, UserMinus, Shield, ShieldCheck, Copy, AlertCircle, User } from 'lucide-react';
+import { Loader2, UserMinus, Shield, ShieldCheck, Copy, AlertCircle, User, RefreshCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 
@@ -31,9 +31,13 @@ export default function FamilyManagement() {
 
   const { data: familyData, isLoading: isFamilyDataLoading } = useDoc(familyDocRef);
 
-  // Fetch all user profiles in the family to get their actual names
+  // Fetch all user profiles in the family to display their actual names
   const membersQuery = useMemoFirebase(() => {
-    return userData?.familyId ? query(collection(db, 'userProfiles'), where('familyId', '==', userData.familyId)) : null;
+    if (!userData?.familyId) return null;
+    return query(
+      collection(db, 'userProfiles'), 
+      where('familyId', '==', userData.familyId)
+    );
   }, [userData?.familyId, db]);
 
   const { data: memberProfiles, isLoading: isMembersLoading } = useCollection(membersQuery);
@@ -126,7 +130,7 @@ export default function FamilyManagement() {
     }
   };
 
-  if (isUserLoading || isUserDataLoading || isFamilyDataLoading || (isMembersLoading && !memberProfiles)) {
+  if (isUserLoading || isUserDataLoading || isFamilyDataLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -177,7 +181,9 @@ export default function FamilyManagement() {
             </div>
             <div className="flex justify-between items-center text-xs">
               <span className="text-white/70">Expires: {new Date(familyData.inviteCodeExpires).toLocaleDateString()}</span>
-              <button className="font-bold underline text-white" onClick={generateNewCode} disabled={isUpdating}>Refresh Code</button>
+              <button className="font-bold underline text-white flex items-center gap-1" onClick={generateNewCode} disabled={isUpdating}>
+                <RefreshCcw className={cn("h-3 w-3", isUpdating && "animate-spin")} /> Refresh Code
+              </button>
             </div>
           </CardContent>
         </Card>
@@ -192,6 +198,8 @@ export default function FamilyManagement() {
           {Object.entries(familyData.members).map(([memberId, role]) => {
             const profile = memberProfiles?.find(p => p.id === memberId);
             const isMe = memberId === user?.uid;
+            
+            // If we have profile data, use the name. Otherwise fallback to loading or UID
             const displayName = profile 
               ? `${profile.firstName} ${profile.lastName}`.trim() || profile.email 
               : (isMe ? "You" : "Loading...");
@@ -225,7 +233,7 @@ export default function FamilyManagement() {
                         onValueChange={(val) => handleRoleChange(memberId, val)}
                         disabled={isMe && adminCount <= 1}
                       >
-                        <SelectTrigger className="h-8 w-28 text-[10px] font-bold">
+                        <SelectTrigger className="h-8 w-28 text-[10px] font-bold rounded-lg">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
