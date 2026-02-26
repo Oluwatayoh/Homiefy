@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -48,7 +47,7 @@ export default function LandingPage() {
         const names = user.displayName?.split(' ') || [];
         await setDoc(userRef, {
           id: user.uid,
-          firstName: names[0] || '',
+          firstName: names[0] || 'User',
           lastName: names.slice(1).join(' ') || '',
           email: user.email,
           displayName: user.displayName,
@@ -112,7 +111,32 @@ export default function LandingPage() {
     if (!email || !password) return;
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      const user = result.user;
+      
+      // Verify profile existence on login
+      const userRef = doc(db, 'userProfiles', user.uid);
+      const userSnap = await getDoc(userRef);
+      
+      if (!userSnap.exists()) {
+        // Create basic profile if missing (rare case)
+        await setDoc(userRef, {
+          id: user.uid,
+          firstName: 'User',
+          lastName: '',
+          email: user.email,
+          displayName: user.email?.split('@')[0] || 'User',
+          role: 'Member',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          preferences: {
+            currency: 'NGN',
+            alertThreshold: 80,
+            pushNotifications: true
+          }
+        });
+      }
+      
       toast({ title: "Welcome Back", description: "Signed in successfully." });
     } catch (error: any) {
       handleAuthError(error);
