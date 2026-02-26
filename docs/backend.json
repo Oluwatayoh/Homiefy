@@ -73,6 +73,24 @@
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       }
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "type": "object",
+      "description": "A financial transaction logged by a user.",
+      "properties": {
+        "id": { "type": "string" },
+        "familyId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "amount": { "type": "number" },
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "receiptPhoto": { "type": "string", "description": "Base64 encoded photo" },
+        "date": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["familyId", "userId", "amount", "category", "date", "createdAt"]
     }
   },
   "auth": {
@@ -102,6 +120,14 @@
           "entityName": "Budget",
           "schema": { "$ref": "#/backend/entities/Budget" },
           "description": "Monthly family budgets."
+        }
+      },
+      {
+        "path": "/families/{familyId}/transactions/{transactionId}",
+        "definition": {
+          "entityName": "Transaction",
+          "schema": { "$ref": "#/backend/entities/Transaction" },
+          "description": "Family transactions."
         }
       }
     ]

@@ -1,57 +1,163 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { impulseSpendingDetection, type ImpulseSpendingDetectionOutput } from '@/ai/flows/impulse-spending-detection';
-import { FAMILY_DATA } from '@/app/lib/mock-data';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { collection, doc, updateDoc, serverTimestamp, increment } from 'firebase/firestore';
+import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, Smile, Meh, Frown, Sparkles, Brain } from 'lucide-react';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { Loader2, Plus, Smile, Meh, Frown, Sparkles, Brain, Camera, X, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-
-const CATEGORIES = ["Groceries", "Dining", "Shopping", "Entertainment", "Transport", "Bills", "Health"];
+import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 
 export default function RapidLog() {
+  const { user, isUserLoading } = useUser();
+  const db = useFirestore();
+  const { toast } = useToast();
+  const router = useRouter();
+
   const [desc, setDesc] = useState('');
   const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState('Shopping');
+  const [category, setCategory] = useState('');
   const [sentiment, setSentiment] = useState<'happy' | 'neutral' | 'unhappy' | null>(null);
   const [loading, setLoading] = useState(false);
   const [impulseResult, setImpulseResult] = useState<ImpulseSpendingDetectionOutput | null>(null);
-  const { toast } = useToast();
+  
+  // Camera state
+  const [showCamera, setShowCamera] = useState(false);
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+  const [receiptPhoto, setReceiptPhoto] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const currentMonthId = new Date().toISOString().slice(0, 7);
+
+  const userDocRef = useMemoFirebase(() => {
+    return user ? doc(db, 'users', user.uid) : null;
+  }, [user, db]);
+
+  const { data: userData } = useDoc(userDocRef);
+
+  const budgetDocRef = useMemoFirebase(() => {
+    return userData?.familyId ? doc(db, 'families', userData.familyId, 'budgets', currentMonthId) : null;
+  }, [userData?.familyId, db, currentMonthId]);
+
+  const { data: budgetData } = useDoc(budgetDocRef);
+
+  const envelopes = budgetData?.envelopes || [];
+
+  useEffect(() => {
+    if (showCamera) {
+      const getCameraPermission = async () => {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+          setHasCameraPermission(true);
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+          }
+        } catch (error) {
+          console.error('Error accessing camera:', error);
+          setHasCameraPermission(false);
+          toast({
+            variant: 'destructive',
+            title: 'Camera Access Denied',
+            description: 'Please enable camera permissions to capture receipts.',
+          });
+        }
+      };
+      getCameraPermission();
+    } else if (videoRef.current?.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+    }
+  }, [showCamera, toast]);
+
+  const capturePhoto = () => {
+    if (videoRef.current && canvasRef.current) {
+      const context = canvasRef.current.getContext('2d');
+      if (context) {
+        canvasRef.current.width = videoRef.current.videoWidth;
+        canvasRef.current.height = videoRef.current.videoHeight;
+        context.drawImage(videoRef.current, 0, 0);
+        const dataUrl = canvasRef.current.toDataURL('image/jpeg', 0.7); // Compression (FR4.2.4)
+        setReceiptPhoto(dataUrl);
+        setShowCamera(false);
+      }
+    }
+  };
 
   async function handleSubmit() {
-    if (!desc || !amount) return;
+    if (!desc || !amount || !category || !userData?.familyId) return;
     setLoading(true);
+    
+    const numericAmount = parseFloat(amount);
+    const familyId = userData.familyId;
+
     try {
+      // 1. AI Impulse Check (FR5.1)
       const result = await impulseSpendingDetection({
         transactionDetails: desc,
-        amount: parseFloat(amount),
+        amount: numericAmount,
         category,
         timestamp: new Date().toISOString(),
-        previousSpendingPatterns: "Frequent dining out and subscription renewals.",
-        familyGoals: FAMILY_DATA.goals.map(g => g.name),
+        previousSpendingPatterns: "Frequent dining and shopping entries.",
+        familyGoals: [], // Could pull goals from Firestore too
       });
       setImpulseResult(result);
+
+      // 2. Save Transaction (FR4.1)
+      const transactionsRef = collection(db, 'families', familyId, 'transactions');
+      const transactionData = {
+        familyId,
+        userId: user!.uid,
+        userName: user!.displayName || 'User',
+        amount: numericAmount,
+        category,
+        description: desc,
+        receiptPhoto: receiptPhoto || null,
+        sentiment: sentiment || 'neutral',
+        date: new Date().toISOString(),
+        createdAt: new Date().toISOString()
+      };
+
+      addDocumentNonBlocking(transactionsRef, transactionData);
+
+      // 3. Update Budget Envelope (FR4.1.6)
+      if (budgetDocRef && budgetData) {
+        const updatedEnvelopes = budgetData.envelopes.map((e: any) => 
+          e.name === category ? { ...e, spent: (e.spent || 0) + numericAmount } : e
+        );
+        updateDoc(budgetDocRef, { envelopes: updatedEnvelopes });
+      }
       
       toast({
         title: "Transaction Logged",
         description: `$${amount} recorded for ${category}.`,
       });
-    } catch (e) {
-      console.error(e);
+
+      // Clear form after delay or redirect
+      setTimeout(() => router.push('/dashboard'), 2000);
+
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Error", description: e.message });
     } finally {
       setLoading(false);
     }
   }
 
+  if (isUserLoading) return <div className="p-10 text-center"><Loader2 className="animate-spin mx-auto" /></div>;
+
   return (
-    <div className="p-6 flex flex-col gap-6">
+    <div className="p-6 pb-24 flex flex-col gap-6">
       <header>
-        <h1 className="text-2xl font-bold font-headline">Log Spend</h1>
+        <h1 className="text-2xl font-bold font-headline">Rapid Log</h1>
         <p className="text-muted-foreground text-sm">Lightning fast record keeping.</p>
       </header>
 
@@ -77,9 +183,10 @@ export default function RapidLog() {
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
               <SelectContent>
-                {CATEGORIES.map(c => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                {envelopes.map(e => (
+                  <SelectItem key={e.id} value={e.name}>{e.name}</SelectItem>
                 ))}
+                {envelopes.length === 0 && <SelectItem value="Uncategorized" disabled>Setup budget first</SelectItem>}
               </SelectContent>
             </Select>
           </div>
@@ -95,8 +202,32 @@ export default function RapidLog() {
           />
         </div>
 
+        {/* Receipt Capture (FR4.2) */}
         <div className="space-y-2">
-          <label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">How do you feel about this?</label>
+          <label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Receipt</label>
+          {!receiptPhoto ? (
+            <Button 
+              variant="outline" 
+              className="w-full h-12 border-dashed rounded-xl gap-2"
+              onClick={() => setShowCamera(true)}
+            >
+              <Camera className="h-5 w-5" /> Add Receipt Photo
+            </Button>
+          ) : (
+            <div className="relative w-full aspect-video rounded-xl overflow-hidden group">
+              <Image src={receiptPhoto} alt="Receipt" fill className="object-cover" />
+              <button 
+                onClick={() => setReceiptPhoto(null)}
+                className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Mood Check</label>
           <div className="flex justify-between gap-2">
             {[
               { id: 'happy', icon: Smile, color: 'text-green-500' },
@@ -119,12 +250,40 @@ export default function RapidLog() {
         <Button 
           className="w-full h-14 rounded-xl text-lg font-bold shadow-lg mt-4"
           onClick={handleSubmit}
-          disabled={loading || !desc || !amount}
+          disabled={loading || !desc || !amount || !category}
         >
           {loading ? <Loader2 className="animate-spin mr-2" /> : <Plus className="mr-2 h-5 w-5" />}
           Log Transaction
         </Button>
       </Card>
+
+      {/* Camera UI (Prompt Recommendation) */}
+      {showCamera && (
+        <div className="fixed inset-0 bg-black z-[100] flex flex-col">
+          <div className="p-4 flex justify-between items-center text-white">
+            <h2 className="font-bold">Capture Receipt</h2>
+            <Button variant="ghost" size="icon" onClick={() => setShowCamera(false)}><X className="h-6 w-6" /></Button>
+          </div>
+          <div className="flex-1 relative bg-neutral-900 flex items-center justify-center">
+            <video ref={videoRef} className="w-full h-full object-contain" autoPlay muted playsInline />
+            {hasCameraPermission === false && (
+              <Alert variant="destructive" className="absolute mx-6">
+                <AlertTitle>Camera Access Required</AlertTitle>
+                <AlertDescription>Please allow camera access in settings.</AlertDescription>
+              </Alert>
+            )}
+          </div>
+          <div className="p-8 bg-black flex justify-center">
+            <button 
+              onClick={capturePhoto}
+              className="w-16 h-16 rounded-full border-4 border-white flex items-center justify-center active:scale-95 transition-transform"
+            >
+              <div className="w-12 h-12 rounded-full bg-white" />
+            </button>
+          </div>
+        </div>
+      )}
+      <canvas ref={canvasRef} className="hidden" />
 
       {impulseResult && (
         <Card className={`border-none shadow-lg animate-in fade-in zoom-in duration-300 overflow-hidden ${impulseResult.isImpulsePurchase ? 'bg-amber-50' : 'bg-green-50'}`}>
@@ -135,12 +294,6 @@ export default function RapidLog() {
               <p className="text-sm font-semibold">{impulseResult.insight}</p>
             </div>
           </div>
-          {impulseResult.isImpulsePurchase && (
-            <div className="bg-amber-100 p-3 text-[10px] font-bold flex justify-between items-center">
-              <span>IMPULSE TRIGGER DETECTED: {impulseResult.spendingTrigger}</span>
-              <Badge variant="outline" className="text-[8px] border-amber-500 text-amber-600">HIGH RISK</Badge>
-            </div>
-          )}
         </Card>
       )}
     </div>

@@ -3,13 +3,14 @@
 
 import { useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
+import { doc, collection, query, orderBy, limit } from 'firebase/firestore';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { TrendingUp, CheckCircle2, MoreHorizontal, Wallet, Loader2, AlertCircle, AlertTriangle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { TrendingUp, CheckCircle2, MoreHorizontal, Wallet, Loader2, AlertCircle, AlertTriangle, ArrowRight, History } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function Dashboard() {
@@ -31,6 +32,18 @@ export default function Dashboard() {
 
   const { data: budgetData, isLoading: isBudgetLoading } = useDoc(budgetDocRef);
 
+  // Recent Transactions (FR7.1)
+  const txQuery = useMemoFirebase(() => {
+    if (!userData?.familyId) return null;
+    return query(
+      collection(db, 'families', userData.familyId, 'transactions'),
+      orderBy('date', 'desc'),
+      limit(5)
+    );
+  }, [userData?.familyId, db]);
+
+  const { data: recentTxs, isLoading: isTxsLoading } = useCollection(txQuery);
+
   // Safe to Spend Calculation Logic (FR3.4)
   const stsData = useMemo(() => {
     if (!budgetData) return { amount: 0, status: 'neutral', percentSpent: 0, alerts: [] };
@@ -47,7 +60,6 @@ export default function Dashboard() {
     const amount = Math.max(0, remainingBudget / daysLeft);
     const percentSpent = totalAllocated > 0 ? (totalSpent / totalAllocated) * 100 : 0;
 
-    // Threshold Alerts (FR3.5)
     const alerts = (budgetData.envelopes || [])
       .filter((e: any) => (e.spent / (e.allocated || 1)) >= 0.8)
       .map((e: any) => ({
@@ -128,35 +140,41 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* Budget Alerts (FR3.5) */}
-      {stsData.alerts.length > 0 && (
-        <section className="animate-in slide-in-from-top-4 duration-500">
-          <div className="flex items-center gap-2 mb-2 px-1">
-            <AlertTriangle className="h-4 w-4 text-amber-500" />
-            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Budget Alerts</h3>
-          </div>
-          <div className="space-y-2">
-            {stsData.alerts.map((alert, i) => (
-              <Card key={i} className="border-none bg-amber-50 shadow-sm">
-                <CardContent className="p-3 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center text-white">
-                      <AlertCircle className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold">{alert.name}</p>
-                      <p className="text-[10px] text-amber-700 font-bold uppercase">{alert.percent}% Spent</p>
-                    </div>
+      {/* Recent Transactions (FR7.1) */}
+      <section>
+        <div className="flex items-center justify-between mb-3 px-1">
+          <h3 className="font-semibold">Recent Activity</h3>
+          <Button variant="ghost" size="sm" onClick={() => router.push('/transactions')} className="text-xs h-8 gap-1">
+            View All <ArrowRight className="h-3 w-3" />
+          </Button>
+        </div>
+        <div className="space-y-2">
+          {recentTxs?.map((tx) => (
+            <Card key={tx.id} className="border-none bg-white shadow-sm overflow-hidden">
+              <CardContent className="p-3 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center text-primary">
+                    <History className="h-4 w-4" />
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => router.push('/budget')} className="h-8 text-amber-700 hover:bg-amber-100">
-                    Adjust
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </section>
-      )}
+                  <div>
+                    <p className="text-xs font-bold truncate max-w-[120px]">{tx.description || tx.category}</p>
+                    <p className="text-[10px] text-muted-foreground">{new Date(tx.date).toLocaleDateString()}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-bold text-primary">${tx.amount.toFixed(2)}</p>
+                  <p className="text-[8px] text-muted-foreground uppercase font-bold">{tx.category}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+          {(!recentTxs || recentTxs.length === 0) && !isTxsLoading && (
+            <div className="text-center p-8 bg-white rounded-xl border-2 border-dashed border-muted text-xs text-muted-foreground">
+              No transactions yet.
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* Shared Budget Overview (FR3.6) */}
       <section>
@@ -188,14 +206,14 @@ export default function Dashboard() {
         </Card>
       </section>
 
-      {/* Navigation Shortcuts */}
+      {/* Quick Actions */}
       <div className="grid grid-cols-2 gap-4 mt-2">
         <button 
           onClick={() => router.push('/log')}
           className="p-4 rounded-2xl bg-white shadow-sm border border-transparent hover:border-primary transition-all text-left"
         >
           <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center mb-3">
-            <MoreHorizontal className="h-5 w-5" />
+            <Plus className="h-5 w-5" />
           </div>
           <p className="font-bold text-sm">Rapid Log</p>
           <p className="text-[10px] text-muted-foreground">Quick entry</p>
