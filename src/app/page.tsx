@@ -86,8 +86,8 @@ export default function LandingPage() {
   };
 
   async function handleGoogleLogin() {
-    const provider = new GoogleAuthProvider();
     setLoading(true);
+    const provider = new GoogleAuthProvider();
     try {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
@@ -115,10 +115,10 @@ export default function LandingPage() {
         });
       }
       toast({ title: "Welcome!", description: "Signed in with Google." });
+      // Navigation handled by the top-level useEffect
     } catch (error: any) {
-      handleAuthError(error);
-    } finally {
       setLoading(false);
+      handleAuthError(error);
     }
   }
 
@@ -160,9 +160,8 @@ export default function LandingPage() {
       saveBiometricCreds(email, password);
       toast({ title: "Welcome!", description: "Account created successfully." });
     } catch (error: any) {
-      handleAuthError(error);
-    } finally {
       setLoading(false);
+      handleAuthError(error);
     }
   }
 
@@ -176,9 +175,8 @@ export default function LandingPage() {
       saveBiometricCreds(email, password);
       toast({ title: "Welcome Back", description: "Signed in successfully." });
     } catch (error: any) {
-      handleAuthError(error);
-    } finally {
       setLoading(false);
+      handleAuthError(error);
     }
   }
 
@@ -190,8 +188,8 @@ export default function LandingPage() {
       return;
     }
 
+    setLoading(true);
     try {
-      setLoading(true);
       const challenge = new Uint8Array(32);
       window.crypto.getRandomValues(challenge);
 
@@ -207,17 +205,18 @@ export default function LandingPage() {
         const decodedPass = atob(storedCred);
         await signInWithEmailAndPassword(auth, storedEmail, decodedPass);
         toast({ title: "Success", description: "Biometric sign-in complete." });
-        router.push('/dashboard');
+        // Redirection handled by useEffect
+      } else {
+        setLoading(false);
       }
     } catch (error: any) {
+      setLoading(false);
       console.error("Biometric login failed:", error);
       let message = 'Could not verify identity. Please use your password.';
       if (error.name === 'NotAllowedError') {
         message = 'Biometric sign-in is restricted by browser security policies.';
       }
       toast({ variant: 'destructive', title: 'Biometric Failed', description: message });
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -265,6 +264,7 @@ export default function LandingPage() {
                     value={email} 
                     onChange={(e) => setEmail(e.target.value)} 
                     required 
+                    disabled={loading}
                   />
                 </div>
               </div>
@@ -279,11 +279,13 @@ export default function LandingPage() {
                     value={password} 
                     onChange={(e) => setPassword(e.target.value)} 
                     required 
+                    disabled={loading}
                   />
                   <button
                     type="button"
                     onClick={() => setShowLoginPassword(!showLoginPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                    disabled={loading}
                   >
                     {showLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -303,7 +305,7 @@ export default function LandingPage() {
                     className="w-full h-12 rounded-xl font-bold gap-2 border-primary/20 hover:bg-primary/5 text-primary"
                     disabled={loading}
                   >
-                    <Fingerprint className="h-5 w-5" /> Sign in with Biometrics
+                    {loading ? <Loader2 className="animate-spin h-5 w-5" /> : <><Fingerprint className="h-5 w-5" /> Sign in with Biometrics</>}
                   </Button>
                 )}
               </div>
@@ -320,6 +322,7 @@ export default function LandingPage() {
                     className={cn("h-12 rounded-xl", errors.firstName && "border-red-500")} 
                     value={firstName} 
                     onChange={(e) => setFirstName(e.target.value)} 
+                    disabled={loading}
                   />
                 </div>
                 <div className="space-y-1">
@@ -329,6 +332,7 @@ export default function LandingPage() {
                     className={cn("h-12 rounded-xl", errors.lastName && "border-red-500")} 
                     value={lastName} 
                     onChange={(e) => setLastName(e.target.value)} 
+                    disabled={loading}
                   />
                 </div>
               </div>
@@ -343,6 +347,7 @@ export default function LandingPage() {
                     className={cn("pl-10 h-12 rounded-xl", errors.email && "border-red-500")} 
                     value={email} 
                     onChange={(e) => setEmail(e.target.value)} 
+                    disabled={loading}
                   />
                 </div>
               </div>
@@ -357,6 +362,7 @@ export default function LandingPage() {
                     className={cn("pl-10 h-12 rounded-xl", errors.phone && "border-red-500")} 
                     value={phoneNumber} 
                     onChange={(e) => setPhoneNumber(e.target.value)} 
+                    disabled={loading}
                   />
                 </div>
               </div>
@@ -371,11 +377,13 @@ export default function LandingPage() {
                     className={cn("pl-10 pr-10 h-12 rounded-xl", errors.password && "border-red-500")} 
                     value={password} 
                     onChange={(e) => setPassword(e.target.value)} 
+                    disabled={loading}
                   />
                   <button
                     type="button"
                     onClick={() => setShowSignupPassword(!showSignupPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                    disabled={loading}
                   >
                     {showSignupPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
