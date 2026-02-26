@@ -9,9 +9,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Zap, ShieldCheck, Mail, Lock, Phone, Loader2, Fingerprint } from 'lucide-react';
+import { Zap, ShieldCheck, Mail, Lock, Phone, Loader2, Fingerprint, AlertCircle } from 'lucide-react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 export default function LandingPage() {
   const { user, isUserLoading } = useUser();
@@ -28,6 +29,9 @@ export default function LandingPage() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [hasBiometrics, setHasBiometrics] = useState(false);
 
+  // Validation States
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
   useEffect(() => {
     if (!isUserLoading && user) {
       router.push('/dashboard');
@@ -35,7 +39,6 @@ export default function LandingPage() {
   }, [user, isUserLoading, router]);
 
   useEffect(() => {
-    // Check if biometrics were previously enabled on this device
     const biometricsEnabled = localStorage.getItem('biometric_enabled') === 'true';
     const storedEmail = localStorage.getItem('biometric_email');
     if (biometricsEnabled && storedEmail) {
@@ -43,6 +46,34 @@ export default function LandingPage() {
       setEmail(storedEmail);
     }
   }, []);
+
+  const validateEmail = (email: string) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
+
+  const validatePhone = (phone: string) => {
+    // Basic phone validation: allows +, digits, spaces, hyphens, parentheses
+    return phone === '' || /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/im.test(phone);
+  };
+
+  const validatePasswordStrength = (pass: string) => {
+    const hasUpperCase = /[A-Z]/.test(pass);
+    const hasLowerCase = /[a-z]/.test(pass);
+    const hasNumber = /[0-9]/.test(pass);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(pass);
+    const isLongEnough = pass.length >= 8;
+
+    return {
+      isValid: hasUpperCase && hasLowerCase && hasNumber && hasSpecialChar && isLongEnough,
+      errors: {
+        length: !isLongEnough,
+        upper: !hasUpperCase,
+        lower: !hasLowerCase,
+        number: !hasNumber,
+        special: !hasSpecialChar,
+      }
+    };
+  };
 
   async function handleGoogleLogin() {
     const provider = new GoogleAuthProvider();
@@ -83,10 +114,35 @@ export default function LandingPage() {
 
   async function handleEmailSignup(e: React.FormEvent) {
     e.preventDefault();
-    if (!email || !password || !firstName || !lastName) {
-      toast({ variant: "destructive", title: "Missing Fields", description: "Please fill in all required fields." });
+    const newErrors: { [key: string]: string } = {};
+
+    if (!firstName) newErrors.firstName = "First name is required";
+    if (!lastName) newErrors.lastName = "Last name is required";
+    
+    if (!validateEmail(email)) {
+      newErrors.email = "Invalid email address";
+    }
+
+    if (!validatePhone(phoneNumber)) {
+      newErrors.phone = "Invalid phone number format";
+    }
+
+    const passStrength = validatePasswordStrength(password);
+    if (!passStrength.isValid) {
+      newErrors.password = "Password must be at least 8 chars with upper, lower, number, and special char";
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      toast({ 
+        variant: "destructive", 
+        title: "Validation Error", 
+        description: "Please correct the highlighted fields." 
+      });
       return;
     }
+
+    setErrors({});
     setLoading(true);
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
@@ -119,7 +175,15 @@ export default function LandingPage() {
 
   async function handleEmailLogin(e: React.FormEvent) {
     e.preventDefault();
-    if (!email || !password) return;
+    if (!validateEmail(email)) {
+      toast({ variant: "destructive", title: "Invalid Email", description: "Please enter a valid email address." });
+      return;
+    }
+    if (!password) {
+      toast({ variant: "destructive", title: "Missing Password", description: "Please enter your password." });
+      return;
+    }
+
     setLoading(true);
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
@@ -160,7 +224,6 @@ export default function LandingPage() {
 
     try {
       setLoading(true);
-      // Prototype-friendly simulated verification using browser credentials API
       const challenge = new Uint8Array(32);
       window.crypto.getRandomValues(challenge);
 
@@ -180,7 +243,7 @@ export default function LandingPage() {
       console.error("Biometric login failed:", error);
       let message = 'Could not verify identity. Please use your password.';
       if (error.name === 'NotAllowedError') {
-        message = 'Biometric sign-in is restricted by the browser in this context (e.g. inside an iframe).';
+        message = 'Biometric sign-in is restricted by browser security policies.';
       }
       toast({ 
         variant: 'destructive', 
@@ -196,7 +259,7 @@ export default function LandingPage() {
     let message = 'An unexpected error occurred.';
     if (error instanceof FirebaseError) {
       if (error.code === 'auth/operation-not-allowed') {
-        message = 'Google sign-in is not enabled. Please enable it in the Firebase Console.';
+        message = 'Google sign-in is not enabled. Please check console.';
       } else if (error.code === 'auth/email-already-in-use') {
         message = 'This email is already registered.';
       } else if (error.code === 'auth/invalid-credential') {
@@ -235,14 +298,28 @@ export default function LandingPage() {
                 <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Email</Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input type="email" placeholder="name@example.com" className="pl-10 h-12 rounded-xl" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                  <Input 
+                    type="email" 
+                    placeholder="name@example.com" 
+                    className="pl-10 h-12 rounded-xl" 
+                    value={email} 
+                    onChange={(e) => setEmail(e.target.value)} 
+                    required 
+                  />
                 </div>
               </div>
               <div className="space-y-1">
                 <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Password</Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input type="password" placeholder="••••••••" className="pl-10 h-12 rounded-xl" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                  <Input 
+                    type="password" 
+                    placeholder="••••••••" 
+                    className="pl-10 h-12 rounded-xl" 
+                    value={password} 
+                    onChange={(e) => setPassword(e.target.value)} 
+                    required 
+                  />
                 </div>
               </div>
               
@@ -271,28 +348,77 @@ export default function LandingPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">First Name</Label>
-                  <Input placeholder="Jane" className="h-12 rounded-xl" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
+                  <Input 
+                    placeholder="Jane" 
+                    className={cn("h-12 rounded-xl", errors.firstName && "border-red-500")} 
+                    value={firstName} 
+                    onChange={(e) => setFirstName(e.target.value)} 
+                  />
+                  {errors.firstName && <p className="text-[10px] text-red-500 font-medium ml-1">{errors.firstName}</p>}
                 </div>
                 <div className="space-y-1">
                   <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Last Name</Label>
-                  <Input placeholder="Doe" className="h-12 rounded-xl" value={lastName} onChange={(e) => setLastName(e.target.value)} required />
+                  <Input 
+                    placeholder="Doe" 
+                    className={cn("h-12 rounded-xl", errors.lastName && "border-red-500")} 
+                    value={lastName} 
+                    onChange={(e) => setLastName(e.target.value)} 
+                  />
+                  {errors.lastName && <p className="text-[10px] text-red-500 font-medium ml-1">{errors.lastName}</p>}
                 </div>
               </div>
+              
               <div className="space-y-1">
                 <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Email</Label>
-                <Input type="email" placeholder="name@example.com" className="h-12 rounded-xl" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    type="email" 
+                    placeholder="name@example.com" 
+                    className={cn("pl-10 h-12 rounded-xl", errors.email && "border-red-500")} 
+                    value={email} 
+                    onChange={(e) => setEmail(e.target.value)} 
+                  />
+                </div>
+                {errors.email && <p className="text-[10px] text-red-500 font-medium ml-1">{errors.email}</p>}
               </div>
+
               <div className="space-y-1">
-                <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Phone</Label>
+                <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Phone (Optional)</Label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input type="tel" placeholder="+234..." className="pl-10 h-12 rounded-xl" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} />
+                  <Input 
+                    type="tel" 
+                    placeholder="+234..." 
+                    className={cn("pl-10 h-12 rounded-xl", errors.phone && "border-red-500")} 
+                    value={phoneNumber} 
+                    onChange={(e) => setPhoneNumber(e.target.value)} 
+                  />
                 </div>
+                {errors.phone && <p className="text-[10px] text-red-500 font-medium ml-1">{errors.phone}</p>}
               </div>
+
               <div className="space-y-1">
                 <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Password</Label>
-                <Input type="password" placeholder="Min 6 characters" className="h-12 rounded-xl" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    type="password" 
+                    placeholder="Min 8 characters" 
+                    className={cn("pl-10 h-12 rounded-xl", errors.password && "border-red-500")} 
+                    value={password} 
+                    onChange={(e) => setPassword(e.target.value)} 
+                  />
+                </div>
+                {errors.password ? (
+                  <p className="text-[9px] text-red-500 leading-tight mt-1 ml-1">{errors.password}</p>
+                ) : (
+                  <p className="text-[9px] text-muted-foreground leading-tight mt-1 ml-1">
+                    Must include uppercase, lowercase, number, and special character.
+                  </p>
+                )}
               </div>
+
               <Button type="submit" className="w-full h-12 rounded-xl font-bold shadow-lg" disabled={loading}>
                 {loading ? <Loader2 className="animate-spin h-5 w-5" /> : "Create Account"}
               </Button>
