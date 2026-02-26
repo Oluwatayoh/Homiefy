@@ -20,10 +20,10 @@ service cloud.firestore {
     }
 
     // Checks if the user is a member of the family.
-    // We use get() to look up the family document and check the members map.
+    // We look up the family document and check the members map.
     function isFamilyMember(familyId) {
-      return isSignedIn() && 
-        get(/databases/$(database)/documents/families/$(familyId)).data.members[request.auth.uid] != null;
+      let family = get(/databases/$(database)/documents/families/$(familyId));
+      return isSignedIn() && family != null && family.data.members[request.auth.uid] != null;
     }
 
     // Checks if the requester and the target resource share the same familyId.
@@ -39,7 +39,8 @@ service cloud.firestore {
      */
     match /userProfiles/{userId} {
       // Allow reading if owner OR if they are in the same family (to see names/avatars).
-      allow read: if isOwner(userId) || areInSameFamily(resource.data.familyId);
+      // This is critical for the Family page to list members.
+      allow read: if isOwner(userId) || (isSignedIn() && areInSameFamily(resource.data.familyId));
       allow write: if isOwner(userId);
     }
 
@@ -47,26 +48,25 @@ service cloud.firestore {
      * @description Rules for family units and their shared data.
      */
     match /families/{familyId} {
-      // Anyone signed in can read the basic family doc (needed for joining via code).
+      // Basic family access.
       allow get: if isSignedIn();
       
-      // Only members can list families (standard security).
+      // Only members can list families they belong to.
       allow list: if isSignedIn() && isFamilyMember(familyId);
       
       // Creation.
       allow create: if isSignedIn();
       
       // Update logic:
-      // 1. Existing members can update.
+      // 1. Existing members can update (Admin/Lead roles usually handled by app logic).
       // 2. New members can join by adding their own UID to the members map.
       allow update: if isSignedIn() && (
         isFamilyMember(familyId) || 
         (
           // Case: Joining a family. 
-          // They must add themselves as 'Member' and not change sensitive fields.
-          request.resource.data.members[request.auth.uid] == 'Member' &&
-          request.resource.data.inviteCode == resource.data.inviteCode &&
-          request.resource.data.name == resource.data.name
+          // They are adding their own UID to the members map.
+          request.resource.data.members[request.auth.uid] != null &&
+          request.resource.data.inviteCode == resource.data.inviteCode
         )
       );
 
