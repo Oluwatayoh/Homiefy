@@ -7,8 +7,8 @@ service cloud.firestore {
      * 
      * CORE PHILOSOPHY:
      * 1. Path-based isolation for User Profiles.
-     * 2. Membership-based isolation for Family data.
-     * 3. Rules require explicit query filters for list operations.
+     * 2. Parent-based membership isolation for Family data.
+     * 3. Simplified listing rules to avoid complex query/filter mismatches.
      */
 
     // --- GLOBAL HELPER FUNCTIONS ---
@@ -42,8 +42,7 @@ service cloud.firestore {
      * @description Rules for family units and their shared data.
      */
     match /families/{familyId} {
-      // Allow any signed-in user to 'get' families (necessary for joining via ID)
-      // Allow 'list' only for joining via invite code search
+      // Allow signed-in users to get and list families (critical for joining via invite code)
       allow get: if isSignedIn();
       allow list: if isSignedIn();
       
@@ -55,21 +54,11 @@ service cloud.firestore {
       allow delete: if isSignedIn() && get(/databases/$(database)/documents/families/$(familyId)).data.members[request.auth.uid] == 'Admin';
 
       /**
-       * @description Rules for family sub-data.
-       * We use explicit matches for better clarity and performance in list operations.
+       * @description Rules for family sub-data (Budgets, Goals, Transactions, Approvals, Decisions).
+       * We use a parent-check for consistent access control across all family data.
        */
-      
-      // Approvals, Transactions, Goals, Budgets, Decisions
-      match /{subCollection}/{docId} {
-        // For list operations, the query must be filtered by the user's membership.
-        // We allow list if the document's own members map contains the user, or if they are a family member.
-        allow list: if isSignedIn() && (
-          resource.data.members[request.auth.uid] != null ||
-          isMemberOfFamily(familyId)
-        );
-        
-        // Single document access and mutations require family membership.
-        allow get, create, update, delete: if isMemberOfFamily(familyId);
+      match /{allSubcollections=**} {
+        allow list, get, create, update, delete: if isMemberOfFamily(familyId);
       }
     }
   }

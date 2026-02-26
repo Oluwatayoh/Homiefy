@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
-import { doc, collection, query, orderBy, deleteDoc, where } from 'firebase/firestore';
+import { doc, collection, query, orderBy, deleteDoc } from 'firebase/firestore';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,16 +33,15 @@ export default function TransactionHistory() {
     return user ? doc(db, 'userProfiles', user.uid) : null;
   }, [user, db]);
 
-  const { data: userData } = useDoc(userDocRef);
+  const { data: userData, isLoading: isUserDataLoading } = useDoc(userDocRef);
 
   const txQuery = useMemoFirebase(() => {
-    if (!userData?.familyId || !user?.uid) return null;
+    if (isUserDataLoading || !userData?.familyId) return null;
     return query(
       collection(db, 'families', userData.familyId, 'transactions'),
-      where(`members.${user.uid}`, '!=', null),
       orderBy('date', sortOrder)
     );
-  }, [userData?.familyId, user?.uid, db, sortOrder]);
+  }, [userData?.familyId, isUserDataLoading, db, sortOrder]);
 
   const { data: transactions, isLoading } = useCollection(txQuery);
 
@@ -65,7 +64,7 @@ export default function TransactionHistory() {
     if (!confirm("Are you sure you want to delete this transaction? This will not automatically reverse budget balances.")) return;
     setIsDeleting(true);
     try {
-      await deleteDoc(doc(db, 'families', userData.familyId!, 'transactions', tx.id));
+      await deleteDoc(doc(db, 'families', userData?.familyId!, 'transactions', tx.id));
       toast({ title: "Transaction Deleted" });
       setSelectedTx(null);
     } catch (e: any) {

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, addDoc, doc, where } from 'firebase/firestore';
+import { collection, query, orderBy, addDoc, doc } from 'firebase/firestore';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -39,7 +39,7 @@ export default function GoalsPage() {
     return user ? doc(db, 'userProfiles', user.uid) : null;
   }, [user, db]);
 
-  const { data: userData } = useDoc(userDocRef);
+  const { data: userData, isLoading: isUserDataLoading } = useDoc(userDocRef);
 
   const familyDocRef = useMemoFirebase(() => {
     return userData?.familyId ? doc(db, 'families', userData.familyId) : null;
@@ -48,13 +48,12 @@ export default function GoalsPage() {
   const { data: familyData } = useDoc(familyDocRef);
 
   const goalsQuery = useMemoFirebase(() => {
-    if (!userData?.familyId || !user?.uid) return null;
+    if (isUserDataLoading || !userData?.familyId) return null;
     return query(
       collection(db, 'families', userData.familyId, 'goals'),
-      where(`members.${user.uid}`, '!=', null),
       orderBy('createdAt', 'desc')
     );
-  }, [userData?.familyId, user?.uid, db]);
+  }, [userData?.familyId, isUserDataLoading, db]);
 
   const { data: goals, isLoading } = useCollection(goalsQuery);
 
