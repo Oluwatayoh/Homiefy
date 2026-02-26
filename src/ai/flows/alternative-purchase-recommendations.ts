@@ -32,7 +32,7 @@ const AlternativePurchaseRecommendationsOutputSchema = z.object({
   recommendations: z
     .array(z.string())
     .describe(
-      'A list of concrete, financially aligned alternative strategies or purchases to consider, like "wait until next month," "consider a cheaper brand," or "reallocate funds to goal X."
+      'A list of concrete, financially aligned alternative strategies or purchases to consider, like "wait until next month," "consider a cheaper brand," or "reallocate funds to goal X."'
     ),
   summary: z
     .string()
