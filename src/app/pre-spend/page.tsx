@@ -2,14 +2,14 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { purchaseImpactAnalysis, type PurchaseImpactAnalysisOutput } from '@/ai/flows/purchase-impact-analysis-flow';
-import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc, collection, setDoc, serverTimestamp } from 'firebase/firestore';
+import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
+import { doc, collection, setDoc, query, where } from 'firebase/firestore';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Zap, AlertTriangle, ArrowRightCircle, Target, Sparkles, Brain, Clock, ShieldCheck, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertTriangle, ArrowRightCircle, Target, Sparkles, Brain, Clock, ShieldCheck, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -61,7 +61,6 @@ export default function PreSpendTool() {
 
   const { data: budgetData } = useDoc(budgetDocRef);
 
-  // Synchronized goals query with explicit membership filter
   const goalsQuery = useMemoFirebase(() => {
     if (!userData?.familyId || !user?.uid) return null;
     return query(
@@ -73,7 +72,7 @@ export default function PreSpendTool() {
   const { data: goalsData } = useCollection(goalsQuery);
 
   const stsData = useMemo(() => {
-    if (!budgetData) return { amount: 0 };
+    if (!budgetData || !mounted) return { amount: 0 };
     const totalAllocated = budgetData.totalIncome || 0;
     const totalSpent = budgetData.envelopes?.reduce((sum: number, e: any) => sum + (e.spent || 0), 0) || 0;
     const remainingBudget = totalAllocated - totalSpent;
@@ -81,7 +80,7 @@ export default function PreSpendTool() {
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const daysLeft = (daysInMonth - now.getDate()) + 1;
     return { amount: Math.max(0, remainingBudget / daysLeft) };
-  }, [budgetData]);
+  }, [budgetData, mounted]);
 
   async function handleAnalyze() {
     if (!budgetData || !familyData) {
@@ -161,7 +160,7 @@ export default function PreSpendTool() {
     }
   }
 
-  if (isUserLoading || !mounted) return <div className="p-10 text-center"><Loader2 className="animate-spin mx-auto" /></div>;
+  if (isUserLoading || !mounted) return <div className="p-10 text-center"><Loader2 className="animate-spin mx-auto text-primary" /></div>;
 
   return (
     <div className="p-6 pb-24 flex flex-col gap-6">
@@ -171,16 +170,16 @@ export default function PreSpendTool() {
       </header>
 
       {!budgetData && (
-        <div className="p-6 rounded-2xl bg-amber-50 border border-amber-200 text-center space-y-4">
+        <div className="p-6 rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 text-center space-y-4">
           <AlertCircle className="w-12 h-12 text-amber-600 mx-auto" />
           <h2 className="font-bold">Active Budget Required</h2>
-          <p className="text-sm text-amber-700">We need your current monthly budget to analyze spending impact.</p>
+          <p className="text-sm text-amber-700 dark:text-amber-400">We need your current monthly budget to analyze spending impact.</p>
           <Button onClick={() => router.push('/budget')}>Create Budget</Button>
         </div>
       )}
 
       {budgetData && !result ? (
-        <Card className="border-none shadow-xl bg-white overflow-hidden">
+        <Card className="border-none shadow-xl bg-white dark:bg-card overflow-hidden">
           <CardHeader className="bg-primary text-white">
             <CardTitle className="flex items-center gap-2">
               <Brain className="h-5 w-5" /> Spending Analysis
@@ -295,7 +294,7 @@ export default function PreSpendTool() {
                   <h3 className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Goal Analysis</h3>
                   <div className="space-y-2">
                     {result.goalImpacts.map((gi, idx) => (
-                      <div key={idx} className="flex items-start gap-3 p-3 rounded-lg border bg-white shadow-sm">
+                      <div key={idx} className="flex items-start gap-3 p-3 rounded-lg border bg-white dark:bg-card shadow-sm">
                         <Target className="h-5 w-5 text-accent shrink-0 mt-0.5" />
                         <div>
                           <p className="text-xs font-bold">{gi.goalName}</p>
