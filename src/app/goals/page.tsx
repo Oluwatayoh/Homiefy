@@ -35,9 +35,11 @@ export default function GoalsPage() {
     setMounted(true);
   }, []);
 
-  const { data: userData } = useDoc(useMemoFirebase(() => {
+  const userDocRef = useMemoFirebase(() => {
     return user ? doc(db, 'userProfiles', user.uid) : null;
-  }, [user, db]));
+  }, [user, db]);
+
+  const { data: userData } = useDoc(userDocRef);
 
   const familyDocRef = useMemoFirebase(() => {
     return userData?.familyId ? doc(db, 'families', userData.familyId) : null;
@@ -46,17 +48,18 @@ export default function GoalsPage() {
   const { data: familyData } = useDoc(familyDocRef);
 
   const goalsQuery = useMemoFirebase(() => {
-    if (!userData?.familyId) return null;
+    if (!userData?.familyId || !user?.uid) return null;
     return query(
       collection(db, 'families', userData.familyId, 'goals'),
+      where(`members.${user.uid}`, '!=', null),
       orderBy('createdAt', 'desc')
     );
-  }, [userData?.familyId, db]);
+  }, [userData?.familyId, user?.uid, db]);
 
   const { data: goals, isLoading } = useCollection(goalsQuery);
 
   const handleAddGoal = async () => {
-    if (!userData?.familyId || !newGoal.name || !newGoal.targetAmount || !familyData) return;
+    if (!userData?.familyId || !newGoal.name || !newGoal.targetAmount || !familyData || !user) return;
     setIsSubmitting(true);
     try {
       await addDoc(collection(db, 'families', userData.familyId, 'goals'), {
@@ -64,6 +67,7 @@ export default function GoalsPage() {
         targetAmount: parseFloat(newGoal.targetAmount),
         currentAmount: 0,
         members: familyData.members,
+        userId: user.uid,
         createdAt: new Date().toISOString()
       });
       toast({ title: "Goal Created", description: "Successfully added your family financial goal." });

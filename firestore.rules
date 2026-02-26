@@ -8,7 +8,7 @@ service cloud.firestore {
      * CORE PHILOSOPHY:
      * 1. Path-based isolation for User Profiles.
      * 2. Membership-based isolation for Family data.
-     * 3. Rules are kept simple to avoid hidden index requirements or 'Missing Permissions' crashes.
+     * 3. Rules require explicit query filters for list operations.
      */
 
     // --- GLOBAL HELPER FUNCTIONS ---
@@ -58,7 +58,7 @@ service cloud.firestore {
        */
       match /{allSubcollections=**} {
         // We use the parent family membership check for all sub-data.
-        // For 'list' operations, Firestore requires the query to be restricted to the familyId path.
+        // For 'list' operations, Firestore requires the query to be restricted to the familyId path and matching filters.
         allow get, list: if isMemberOfFamily(familyId);
         allow create, update, delete: if isMemberOfFamily(familyId);
       }

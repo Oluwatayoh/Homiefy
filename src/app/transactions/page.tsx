@@ -36,12 +36,13 @@ export default function TransactionHistory() {
   const { data: userData } = useDoc(userDocRef);
 
   const txQuery = useMemoFirebase(() => {
-    if (!userData?.familyId) return null;
+    if (!userData?.familyId || !user?.uid) return null;
     return query(
       collection(db, 'families', userData.familyId, 'transactions'),
+      where(`members.${user.uid}`, '!=', null),
       orderBy('date', sortOrder)
     );
-  }, [userData?.familyId, db, sortOrder]);
+  }, [userData?.familyId, user?.uid, db, sortOrder]);
 
   const { data: transactions, isLoading } = useCollection(txQuery);
 
