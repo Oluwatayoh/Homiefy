@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useUser, useAuth, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { useUser, useAuth, useUser as useFirebaseUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -42,6 +42,13 @@ export default function ProfilePage() {
   const [pushEnabled, setPushEnabled] = useState(true);
   const [alertThreshold, setAlertThreshold] = useState([80]);
   const [currency, setCurrency] = useState('USD');
+
+  // Handle redirection if not logged in
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.push('/');
+    }
+  }, [user, isUserLoading, router]);
 
   useEffect(() => {
     if (userData) {
@@ -105,6 +112,11 @@ export default function ProfilePage() {
     }
   };
 
+  const handleLogout = async () => {
+    await auth.signOut();
+    router.push('/');
+  };
+
   if (isUserLoading || isUserDataLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -114,14 +126,8 @@ export default function ProfilePage() {
   }
 
   if (!user) {
-    router.push('/');
     return null;
   }
-
-  const handleLogout = async () => {
-    await auth.signOut();
-    router.push('/');
-  };
 
   return (
     <div className="p-6 flex flex-col gap-6 pb-24">
@@ -167,7 +173,7 @@ export default function ProfilePage() {
                   <UserIcon className="h-5 w-5 text-primary" />
                   <span>Personal Information</span>
                 </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-90" />
+                <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform duration-200" />
               </AccordionTrigger>
               <AccordionContent className="p-4 bg-secondary/10 rounded-b-xl space-y-4">
                 <div className="space-y-2">
