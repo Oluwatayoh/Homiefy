@@ -14,7 +14,7 @@ import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { LogOut, User as UserIcon, Settings, Bell, Shield, ChevronRight, Loader2, Save, Upload, X, Info, Fingerprint, Trash2, Lock } from 'lucide-react';
+import { LogOut, User as UserIcon, Settings, Bell, Shield, ChevronRight, Loader2, Save, Upload, X, Info, Fingerprint, Trash2, Lock, Mail, Phone } from 'lucide-react';
 import { doc, setDoc } from 'firebase/firestore';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from '@/hooks/use-toast';
@@ -38,6 +38,7 @@ export default function ProfilePage() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [editPhone, setEditPhone] = useState('');
+  const [editEmail, setEditEmail] = useState('');
   const [editPhoto, setEditPhoto] = useState<string | null>(null);
   
   const [pushEnabled, setPushEnabled] = useState(true);
@@ -59,6 +60,7 @@ export default function ProfilePage() {
       setFirstName(userData.firstName || '');
       setLastName(userData.lastName || '');
       setEditPhone(userData.phoneNumber || '');
+      setEditEmail(userData.email || '');
       setEditPhoto(userData.photoUrl || null);
       setPushEnabled(userData.preferences?.pushNotifications ?? true);
       setAlertThreshold([userData.preferences?.alertThreshold ?? 80]);
@@ -92,6 +94,7 @@ export default function ProfilePage() {
         lastName,
         displayName: `${firstName} ${lastName}`,
         phoneNumber: editPhone,
+        email: editEmail,
         photoUrl: editPhoto,
         updatedAt: new Date().toISOString(),
         preferences: {
@@ -161,6 +164,10 @@ export default function ProfilePage() {
 
   if (!user) return null;
 
+  // Logic: Disable if field exists in the database
+  const isEmailDisabled = !!userData?.email;
+  const isPhoneDisabled = !!userData?.phoneNumber;
+
   return (
     <div className="p-6 flex flex-col gap-6 pb-24">
       <header>
@@ -206,10 +213,37 @@ export default function ProfilePage() {
                     <Input value={lastName} onChange={(e) => setLastName(e.target.value)} className="rounded-xl" />
                   </div>
                 </div>
+                
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-bold uppercase text-muted-foreground">Mobile Number</Label>
-                  <Input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} className="rounded-xl" />
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground flex items-center gap-1">
+                    Email {isEmailDisabled && <Lock className="h-2.5 w-2.5 text-muted-foreground" />}
+                  </Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                      value={editEmail} 
+                      onChange={(e) => setEditEmail(e.target.value)} 
+                      disabled={isEmailDisabled}
+                      className="rounded-xl pl-10 bg-white/50 disabled:opacity-50" 
+                    />
+                  </div>
                 </div>
+
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground flex items-center gap-1">
+                    Mobile Number {isPhoneDisabled && <Lock className="h-2.5 w-2.5 text-muted-foreground" />}
+                  </Label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                      value={editPhone} 
+                      onChange={(e) => setEditPhone(e.target.value)} 
+                      disabled={isPhoneDisabled}
+                      className="rounded-xl pl-10 bg-white/50 disabled:opacity-50" 
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <Label className="text-[10px] font-bold uppercase text-muted-foreground">Profile Photo</Label>
                   <div className="flex gap-2">
