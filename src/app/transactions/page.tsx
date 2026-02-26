@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Loader2, Search, Filter, ArrowUpDown, Trash2, Edit3, User, Tag, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { getCurrencySymbol } from '@/lib/currency';
 
 export default function TransactionHistory() {
   const { user, isUserLoading } = useUser();
@@ -35,7 +36,15 @@ export default function TransactionHistory() {
 
   const { data: userData, isLoading: isUserDataLoading } = useDoc(userDocRef);
 
-  // Synchronized query with membership filter to satisfy firestore.rules
+  const familyDocRef = useMemoFirebase(() => {
+    return userData?.familyId ? doc(db, 'families', userData.familyId) : null;
+  }, [userData?.familyId, db]);
+
+  const { data: familyData } = useDoc(familyDocRef);
+
+  const currencyCode = userData?.preferences?.currency || familyData?.currencyCode || 'NGN';
+  const currencySymbol = getCurrencySymbol(currencyCode);
+
   const txQuery = useMemoFirebase(() => {
     if (isUserDataLoading || !userData?.familyId || !user?.uid) return null;
     return query(
@@ -142,7 +151,7 @@ export default function TransactionHistory() {
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-sm font-bold text-primary">${tx.amount?.toFixed(2)}</p>
+                <p className="text-sm font-bold text-primary">{currencySymbol}{tx.amount?.toFixed(2)}</p>
                 <Badge variant="secondary" className="text-[8px] px-1 py-0 h-4">
                   {tx.category}
                 </Badge>
@@ -171,7 +180,7 @@ export default function TransactionHistory() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 rounded-xl bg-secondary/30">
                   <p className="text-[10px] font-bold uppercase text-muted-foreground">Amount</p>
-                  <p className="text-xl font-bold">${selectedTx.amount?.toFixed(2)}</p>
+                  <p className="text-xl font-bold">{currencySymbol}{selectedTx.amount?.toFixed(2)}</p>
                 </div>
                 <div className="p-3 rounded-xl bg-secondary/30">
                   <p className="text-[10px] font-bold uppercase text-muted-foreground">Category</p>

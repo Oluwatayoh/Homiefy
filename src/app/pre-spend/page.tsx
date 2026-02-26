@@ -14,6 +14,7 @@ import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import { getCurrencySymbol } from '@/lib/currency';
 
 export default function PreSpendTool() {
   const { user, isUserLoading } = useUser();
@@ -46,6 +47,9 @@ export default function PreSpendTool() {
 
   const { data: familyData } = useDoc(familyDocRef);
 
+  const currencyCode = userData?.preferences?.currency || familyData?.currencyCode || 'NGN';
+  const currencySymbol = getCurrencySymbol(currencyCode);
+
   const currentMonthId = useMemo(() => {
     if (!mounted) return '';
     return new Date().toISOString().slice(0, 7);
@@ -57,14 +61,20 @@ export default function PreSpendTool() {
 
   const { data: budgetData } = useDoc(budgetDocRef);
 
-  const mockGoals = [
-    { name: "Emergency Fund", targetAmount: 10000, currentAmount: 5000, deadline: "2025-12-01" },
-    { name: "Family Vacation", targetAmount: 3000, currentAmount: 800, deadline: "2025-06-01" }
-  ];
+  // Synchronized goals query with explicit membership filter
+  const goalsQuery = useMemoFirebase(() => {
+    if (!userData?.familyId || !user?.uid) return null;
+    return query(
+      collection(db, 'families', userData.familyId, 'goals'),
+      where(`members.${user.uid}`, '!=', null)
+    );
+  }, [userData?.familyId, user?.uid, db]);
+
+  const { data: goalsData } = useCollection(goalsQuery);
 
   const stsData = useMemo(() => {
     if (!budgetData) return { amount: 0 };
-    const totalAllocated = budgetData.envelopes?.reduce((sum: number, e: any) => sum + (e.allocated || 0), 0) || 0;
+    const totalAllocated = budgetData.totalIncome || 0;
     const totalSpent = budgetData.envelopes?.reduce((sum: number, e: any) => sum + (e.spent || 0), 0) || 0;
     const remainingBudget = totalAllocated - totalSpent;
     const now = new Date();
@@ -95,7 +105,12 @@ export default function PreSpendTool() {
         envelopeTotal: selectedEnvelope?.allocated || 0,
         currentSavings: 15000,
         safeToSpendDaily: stsData.amount,
-        familyGoals: mockGoals,
+        familyGoals: goalsData?.map(g => ({
+          name: g.name,
+          targetAmount: g.targetAmount,
+          currentAmount: g.currentAmount,
+          deadline: g.deadline
+        })) || [],
       });
 
       setResult(analysis);
@@ -109,7 +124,7 @@ export default function PreSpendTool() {
         category,
         description: purchaseName,
         priority,
-        members: familyData.members, // Denormalize membership for security rules
+        members: familyData.members,
         aiAnalysis: {
           impactSummary: analysis.impactSummary,
           regretScore: analysis.regretScore,
@@ -179,7 +194,7 @@ export default function PreSpendTool() {
               <div className="space-y-1">
                 <label className="text-[10px] font-bold uppercase text-muted-foreground">Amount</label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-lg">$</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-lg">{currencySymbol}</span>
                   <Input 
                     type="number" 
                     placeholder="0.00" 
@@ -271,7 +286,7 @@ export default function PreSpendTool() {
                 </div>
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold uppercase text-muted-foreground">Daily STS After</p>
-                  <p className="text-lg font-bold text-primary">${result.budgetImpactDetails.newSafeToSpendDaily.toFixed(2)}</p>
+                  <p className="text-lg font-bold text-primary">{currencySymbol}{result.budgetImpactDetails.newSafeToSpendDaily.toFixed(2)}</p>
                 </div>
               </div>
 

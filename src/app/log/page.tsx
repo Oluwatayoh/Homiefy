@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
+import { getCurrencySymbol } from '@/lib/currency';
 
 export default function RapidLog() {
   const { user, isUserLoading } = useUser();
@@ -62,6 +63,9 @@ export default function RapidLog() {
   }, [userData?.familyId, db]);
 
   const { data: familyData } = useDoc(familyDocRef);
+
+  const currencyCode = userData?.preferences?.currency || familyData?.currencyCode || 'NGN';
+  const currencySymbol = getCurrencySymbol(currencyCode);
 
   const budgetDocRef = useMemoFirebase(() => {
     return userData?.familyId && currentMonthId ? doc(db, 'families', userData.familyId, 'budgets', currentMonthId) : null;
@@ -156,7 +160,7 @@ export default function RapidLog() {
         description: desc,
         receiptPhoto: receiptPhoto || null,
         sentiment: sentiment || 'neutral',
-        members: familyData.members, // Denormalize membership for security rules
+        members: familyData.members,
         date: new Date(date).toISOString(),
         createdAt: new Date().toISOString()
       };
@@ -172,10 +176,10 @@ export default function RapidLog() {
       
       toast({
         title: "Transaction Logged",
-        description: `$${amount} recorded for ${category}.`,
+        description: `${currencySymbol}${amount} recorded for ${category}.`,
       });
 
-      setTimeout(() => router.push('/dashboard'), 2000);
+      setTimeout(() => router.push('/dashboard'), 1500);
 
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });
@@ -196,7 +200,7 @@ export default function RapidLog() {
         requesterName: user.displayName || 'User',
         status: 'Pending',
         justification,
-        members: familyData.members, // Denormalize membership for security rules
+        members: familyData.members,
         requestedAt: new Date().toISOString(),
         transactionData: {
           amount: parseFloat(amount),
@@ -238,7 +242,7 @@ export default function RapidLog() {
           <div className="space-y-1">
             <label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Amount</label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-lg">$</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-lg">{currencySymbol}</span>
               <Input 
                 type="number" 
                 placeholder="0.00" 
@@ -333,7 +337,7 @@ export default function RapidLog() {
             <ShieldAlert className="h-5 w-5 text-amber-600 shrink-0" />
             <div>
               <p className="text-xs font-bold text-amber-900">Approval Required</p>
-              <p className="text-[10px] text-amber-700">This amount exceeds your family spending threshold (${threshold}).</p>
+              <p className="text-[10px] text-amber-700">This amount exceeds your family spending threshold ({currencySymbol}{threshold}).</p>
             </div>
           </div>
         )}

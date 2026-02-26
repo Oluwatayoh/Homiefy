@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Pie, PieChart as RePieChart, Cell, ResponsiveContainer } from 'recharts';
+import { getCurrencySymbol } from '@/lib/currency';
 
 export default function Dashboard() {
   const { user, isUserLoading } = useUser();
@@ -48,6 +49,9 @@ export default function Dashboard() {
 
   const { data: familyData } = useDoc(familyDocRef);
 
+  const currencyCode = userData?.preferences?.currency || familyData?.currencyCode || 'NGN';
+  const currencySymbol = getCurrencySymbol(currencyCode);
+
   const currentMonthId = useMemo(() => {
     if (!mounted) return '';
     return new Date().toISOString().slice(0, 7);
@@ -61,7 +65,6 @@ export default function Dashboard() {
 
   const isStaff = userData?.role === 'Admin' || userData?.role === 'Co-Manager';
 
-  // Explicit membership filters to satisfy firestore.rules
   const txQuery = useMemoFirebase(() => {
     if (isUserDataLoading || !userData?.familyId || !user?.uid) return null;
     return query(
@@ -100,29 +103,21 @@ export default function Dashboard() {
 
   const approvalsQuery = useMemoFirebase(() => {
     if (isUserDataLoading || !userData?.familyId || !user?.uid) return null;
-    
-    const baseCol = collection(db, 'families', userData.familyId, 'approvals');
-    const membershipFilter = where(`members.${user.uid}`, '!=', null);
-    
-    if (isStaff) {
-      return query(
-        baseCol,
-        membershipFilter,
-        where('status', '==', 'Pending'),
-        orderBy('requestedAt', 'desc')
-      );
-    } else {
-      return query(
-        baseCol,
-        membershipFilter,
-        where('requesterId', '==', user.uid),
-        where('status', '==', 'Pending'),
-        orderBy('requestedAt', 'desc')
-      );
-    }
-  }, [userData?.familyId, user?.uid, isUserDataLoading, isStaff, db]);
+    return query(
+      collection(db, 'families', userData.familyId, 'approvals'),
+      where(`members.${user.uid}`, '!=', null),
+      where('status', '==', 'Pending'),
+      orderBy('requestedAt', 'desc')
+    );
+  }, [userData?.familyId, user?.uid, isUserDataLoading, db]);
 
   const { data: pendingApprovals, isLoading: isApprovalsLoading } = useCollection(approvalsQuery);
+
+  const filteredApprovals = useMemo(() => {
+    if (!pendingApprovals || !user) return [];
+    if (isStaff) return pendingApprovals;
+    return pendingApprovals.filter(a => a.requesterId === user.uid);
+  }, [pendingApprovals, isStaff, user]);
 
   const stsData = useMemo(() => {
     if (!budgetData || !mounted) return { 
@@ -157,13 +152,6 @@ export default function Dashboard() {
         fill: `hsl(var(--chart-${(i % 5) + 1}))`
       }));
 
-    const alerts = (budgetData.envelopes || [])
-      .filter((e: any) => (e.spent / (e.allocated || 1)) >= 0.8)
-      .map((e: any) => ({
-        name: e.name,
-        percent: Math.round((e.spent / (e.allocated || 1)) * 100)
-      }));
-
     let status = 'green';
     if (remainingBudget <= 0) status = 'red';
     else if (percentSpent > 80) status = 'yellow';
@@ -187,7 +175,6 @@ export default function Dashboard() {
       percentSpent, 
       totalAllocated, 
       totalSpent, 
-      alerts, 
       pieData,
       totalHealthScore,
       breakdown: { adherenceScore, savingsScore, goalScore, impulseScore }
@@ -292,7 +279,7 @@ export default function Dashboard() {
           <CardContent className="pt-8">
             <p className="text-white/80 text-sm font-medium">Safe to spend today</p>
             <div className="flex items-baseline gap-2 mt-1">
-              <h2 className="text-5xl font-bold tracking-tight">${stsData.amount.toFixed(2)}</h2>
+              <h2 className="text-5xl font-bold tracking-tight">{currencySymbol}{stsData.amount.toFixed(2)}</h2>
             </div>
             <div className="mt-4 flex items-center gap-2">
               {stsData.status === 'green' && (
@@ -398,17 +385,17 @@ export default function Dashboard() {
           <Skeleton className="h-4 w-32 mb-2" />
           <Skeleton className="h-16 w-full rounded-xl" />
         </div>
-      ) : pendingApprovals && pendingApprovals.length > 0 ? (
+      ) : filteredApprovals.length > 0 ? (
         <section>
           <div className="flex items-center justify-between mb-3 px-1">
             <h3 className="font-semibold flex items-center gap-2">
               <ShieldCheck className="h-4 w-4 text-primary" /> 
               {isStaff ? "Needs Approval" : "Your Requests"}
             </h3>
-            <Badge className="bg-primary text-[10px] font-bold">{pendingApprovals.length} PENDING</Badge>
+            <Badge className="bg-primary text-[10px] font-bold">{filteredApprovals.length} PENDING</Badge>
           </div>
           <div className="space-y-2">
-            {pendingApprovals.map((req) => (
+            {filteredApprovals.map((req) => (
               <Card 
                 key={req.id} 
                 className="border-none bg-amber-50 shadow-sm border-l-4 border-amber-500 cursor-pointer hover:bg-amber-100 transition-colors"
@@ -421,7 +408,7 @@ export default function Dashboard() {
                     </div>
                     <div>
                       <p className="text-xs font-bold">{req.transactionData?.description || req.transactionData?.category}</p>
-                      <p className="text-[10px] text-muted-foreground">{req.requesterName} • ${req.transactionData?.amount?.toFixed(2)}</p>
+                      <p className="text-[10px] text-muted-foreground">{req.requesterName} • {currencySymbol}{req.transactionData?.amount?.toFixed(2)}</p>
                     </div>
                   </div>
                   <Badge variant="outline" className="text-[8px] border-amber-300 text-amber-700">REVIEW</Badge>
@@ -458,7 +445,7 @@ export default function Dashboard() {
                       <span className="text-[10px] font-bold text-primary">{Math.round(percent)}%</span>
                     </div>
                     <Progress value={percent} className="h-1.5" />
-                    <p className="text-[8px] text-muted-foreground text-right">Target: ${goal.targetAmount.toLocaleString()}</p>
+                    <p className="text-[8px] text-muted-foreground text-right">Target: {currencySymbol}{goal.targetAmount.toLocaleString()}</p>
                   </Card>
                 );
               })}
@@ -490,7 +477,7 @@ export default function Dashboard() {
         ) : recentTxs && recentTxs.length > 0 ? (
           <div className="space-y-2">
             {recentTxs.map((tx) => (
-              <Card key={tx.id} className="border-none bg-white shadow-sm overflow-hidden" onClick={() => router.push(`/transactions?id=${tx.id}`)}>
+              <Card key={tx.id} className="border-none bg-white shadow-sm overflow-hidden" onClick={() => router.push(`/transactions`)}>
                 <CardContent className="p-3 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center text-primary">
@@ -502,7 +489,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs font-bold text-primary">${tx.amount.toFixed(2)}</p>
+                    <p className="text-xs font-bold text-primary">{currencySymbol}{tx.amount.toFixed(2)}</p>
                     <p className="text-[8px] text-muted-foreground uppercase font-bold">{tx.category}</p>
                   </div>
                 </CardContent>
@@ -608,7 +595,7 @@ export default function Dashboard() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 rounded-xl bg-secondary/30">
                   <p className="text-[10px] font-bold uppercase text-muted-foreground">Amount</p>
-                  <p className="text-xl font-bold">${selectedApproval.transactionData?.amount?.toFixed(2)}</p>
+                  <p className="text-xl font-bold">{currencySymbol}{selectedApproval.transactionData?.amount?.toFixed(2)}</p>
                 </div>
                 <div className="p-3 rounded-xl bg-secondary/30">
                   <p className="text-[10px] font-bold uppercase text-muted-foreground">Category</p>

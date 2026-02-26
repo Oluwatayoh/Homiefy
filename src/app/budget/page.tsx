@@ -12,6 +12,7 @@ import { Loader2, Info, CheckCircle2, AlertTriangle, Wand2, ChevronLeft, Chevron
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { getCurrencySymbol } from '@/lib/currency';
 
 const DEFAULT_ENVELOPES = [
   { id: 'housing', name: 'Housing', icon: 'Home', allocated: 0 },
@@ -70,6 +71,9 @@ export default function BudgetManagement() {
   }, [userData?.familyId, db]);
 
   const { data: familyData } = useDoc(familyDocRef);
+
+  const currencyCode = userData?.preferences?.currency || familyData?.currencyCode || 'NGN';
+  const currencySymbol = getCurrencySymbol(currencyCode);
 
   const budgetDocRef = useMemoFirebase(() => {
     return userData?.familyId && monthId ? doc(db, 'families', userData.familyId, 'budgets', monthId) : null;
@@ -146,7 +150,7 @@ export default function BudgetManagement() {
         totalIncome: parseFloat(income),
         envelopes: envelopes,
         status: 'Active',
-        members: familyData.members, // Denormalize membership for rules
+        members: familyData.members,
         updatedAt: new Date().toISOString()
       };
 
@@ -222,7 +226,7 @@ export default function BudgetManagement() {
               <div className="space-y-1">
                 <label className="text-[10px] font-bold uppercase text-white/70 tracking-widest">Monthly Net Income</label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-xl">$</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-xl">{currencySymbol}</span>
                   <Input 
                     type="number" 
                     placeholder="0.00" 
@@ -237,12 +241,12 @@ export default function BudgetManagement() {
               <div className="grid grid-cols-2 gap-4 pt-2">
                 <div>
                   <p className="text-[10px] font-bold uppercase text-white/70">Total Spent</p>
-                  <p className="text-lg font-bold">${totalSpent.toFixed(2)}</p>
+                  <p className="text-lg font-bold">{currencySymbol}{totalSpent.toFixed(2)}</p>
                 </div>
                 <div>
                   <p className="text-[10px] font-bold uppercase text-white/70">Remaining</p>
                   <p className={cn("text-lg font-bold", remainingIncome < 0 ? "text-red-300" : "text-white")}>
-                    ${remainingIncome.toFixed(2)}
+                    {currencySymbol}{remainingIncome.toFixed(2)}
                   </p>
                 </div>
               </div>
@@ -265,7 +269,7 @@ export default function BudgetManagement() {
           {isCurrentMonth && remainingIncome > 0 && parseFloat(income) > 0 && (
             <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 flex items-center gap-2 text-amber-700 text-xs font-bold">
               <Info className="h-4 w-4" />
-              UNALLOCATED FUNDS: ${remainingIncome.toFixed(2)}
+              UNALLOCATED FUNDS: {currencySymbol}{remainingIncome.toFixed(2)}
             </div>
           )}
 
@@ -296,11 +300,11 @@ export default function BudgetManagement() {
                             <h4 className="text-sm font-bold">{env.name}</h4>
                             <div className="flex items-center gap-2 mt-0.5">
                               <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">
-                                ${env.spent.toFixed(0)} spent
+                                {currencySymbol}{env.spent.toFixed(0)} spent
                               </span>
                               <span className="text-[10px] text-muted-foreground/30">•</span>
                               <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">
-                                ${(env.allocated - env.spent).toFixed(0)} left
+                                {currencySymbol}{(env.allocated - env.spent).toFixed(0)} left
                               </span>
                             </div>
                           </div>
@@ -317,7 +321,7 @@ export default function BudgetManagement() {
                           </div>
                         ) : (
                           <div className="text-right">
-                            <p className="text-sm font-bold">${env.allocated.toFixed(0)}</p>
+                            <p className="text-sm font-bold">{currencySymbol}{env.allocated.toFixed(0)}</p>
                             <p className="text-[10px] text-muted-foreground font-bold uppercase">Budget</p>
                           </div>
                         )}

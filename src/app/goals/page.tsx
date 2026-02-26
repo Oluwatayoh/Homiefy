@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, addDoc, doc, updateDoc, where } from 'firebase/firestore';
@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Target, Calendar, TrendingUp, Plus, Loader2, Sparkles, Goal as GoalIcon, PlusCircle, PiggyBank } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { getCurrencySymbol } from '@/lib/currency';
 
 export default function GoalsPage() {
   const { user, isUserLoading } = useUser();
@@ -49,7 +50,9 @@ export default function GoalsPage() {
 
   const { data: familyData } = useDoc(familyDocRef);
 
-  // Synchronized query with membership filter to satisfy firestore.rules
+  const currencyCode = userData?.preferences?.currency || familyData?.currencyCode || 'NGN';
+  const currencySymbol = getCurrencySymbol(currencyCode);
+
   const goalsQuery = useMemoFirebase(() => {
     if (isUserDataLoading || !userData?.familyId || !user?.uid) return null;
     return query(
@@ -69,7 +72,7 @@ export default function GoalsPage() {
         ...newGoal,
         targetAmount: parseFloat(newGoal.targetAmount),
         currentAmount: 0,
-        members: familyData.members, // Denormalize membership for rules
+        members: familyData.members,
         userId: user.uid,
         createdAt: new Date().toISOString()
       });
@@ -95,7 +98,7 @@ export default function GoalsPage() {
         updatedAt: new Date().toISOString()
       });
 
-      toast({ title: "Contribution Added", description: `You added $${contributionAmount} to ${showContribute.name}!` });
+      toast({ title: "Contribution Added", description: `You added ${currencySymbol}${contributionAmount} to ${showContribute.name}!` });
       setShowContribute(null);
       setContributionAmount('');
     } catch (e: any) {
@@ -148,8 +151,8 @@ export default function GoalsPage() {
                     
                     <div className="mt-8 mb-4">
                       <div className="flex justify-between text-sm font-bold mb-2">
-                        <span>${goal.currentAmount.toLocaleString()}</span>
-                        <span className="text-muted-foreground">${goal.targetAmount.toLocaleString()}</span>
+                        <span>{currencySymbol}{goal.currentAmount.toLocaleString()}</span>
+                        <span className="text-muted-foreground">{currencySymbol}{goal.targetAmount.toLocaleString()}</span>
                       </div>
                       <Progress value={percent} className="h-3 bg-secondary" />
                     </div>
@@ -171,7 +174,7 @@ export default function GoalsPage() {
                      <div className="w-px bg-border h-full" />
                      <div className="text-center">
                        <p className="text-[10px] uppercase font-bold text-muted-foreground">Remaining</p>
-                       <p className="font-bold text-primary">${Math.max(0, goal.targetAmount - goal.currentAmount).toLocaleString()}</p>
+                       <p className="font-bold text-primary">{currencySymbol}{Math.max(0, goal.targetAmount - goal.currentAmount).toLocaleString()}</p>
                      </div>
                   </div>
                 </CardContent>
@@ -214,13 +217,16 @@ export default function GoalsPage() {
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-bold uppercase text-muted-foreground">Target Amount</label>
-              <Input 
-                type="number"
-                placeholder="0.00" 
-                value={newGoal.targetAmount}
-                onChange={(e) => setNewGoal({...newGoal, targetAmount: e.target.value})}
-                className="rounded-xl"
-              />
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-muted-foreground">{currencySymbol}</span>
+                <Input 
+                  type="number"
+                  placeholder="0.00" 
+                  value={newGoal.targetAmount}
+                  onChange={(e) => setNewGoal({...newGoal, targetAmount: e.target.value})}
+                  className="rounded-xl pl-8"
+                />
+              </div>
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-bold uppercase text-muted-foreground">Deadline (Optional)</label>
@@ -252,7 +258,7 @@ export default function GoalsPage() {
             <div className="space-y-1">
               <label className="text-[10px] font-bold uppercase text-muted-foreground">Amount to save</label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-lg">$</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-lg">{currencySymbol}</span>
                 <Input 
                   type="number" 
                   placeholder="0.00" 
