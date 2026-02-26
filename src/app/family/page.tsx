@@ -1,16 +1,15 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc, updateDoc, deleteField } from 'firebase/firestore';
+import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
+import { doc, updateDoc, deleteField, collection, query, where } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, UserMinus, Shield, ShieldCheck, Copy, AlertCircle } from 'lucide-react';
+import { Loader2, UserMinus, Shield, ShieldCheck, Copy, AlertCircle, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 
@@ -31,6 +30,13 @@ export default function FamilyManagement() {
   }, [userData?.familyId, db]);
 
   const { data: familyData, isLoading: isFamilyDataLoading } = useDoc(familyDocRef);
+
+  // Fetch all user profiles in the family to get their actual names
+  const membersQuery = useMemoFirebase(() => {
+    return userData?.familyId ? query(collection(db, 'userProfiles'), where('familyId', '==', userData.familyId)) : null;
+  }, [userData?.familyId, db]);
+
+  const { data: memberProfiles, isLoading: isMembersLoading } = useCollection(membersQuery);
 
   const [isUpdating, setIsUpdating] = useState(false);
 
@@ -72,7 +78,7 @@ export default function FamilyManagement() {
     
     const currentRole = familyData.members[targetUserId];
     if (currentRole === 'Admin' && newRole !== 'Admin' && adminCount <= 1) {
-      toast({ variant: "destructive", title: "Action Blocked", description: "BR8.4.1: You must have at least one Admin in the family." });
+      toast({ variant: "destructive", title: "Action Blocked", description: "You must have at least one Admin in the family." });
       return;
     }
 
@@ -97,7 +103,7 @@ export default function FamilyManagement() {
     
     const currentRole = familyData.members[targetUserId];
     if (currentRole === 'Admin' && adminCount <= 1) {
-      toast({ variant: "destructive", title: "Action Blocked", description: "BR8.4.1: Cannot remove the last Admin. Promote someone else first." });
+      toast({ variant: "destructive", title: "Action Blocked", description: "Cannot remove the last Admin. Promote someone else first." });
       return;
     }
 
@@ -120,9 +126,9 @@ export default function FamilyManagement() {
     }
   };
 
-  if (isUserLoading || isUserDataLoading || isFamilyDataLoading) {
+  if (isUserLoading || isUserDataLoading || isFamilyDataLoading || (isMembersLoading && !memberProfiles)) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
@@ -130,7 +136,7 @@ export default function FamilyManagement() {
 
   if (!familyData) {
     return (
-      <div className="p-6 flex flex-col items-center justify-center min-h-screen text-center">
+      <div className="p-6 flex flex-col items-center justify-center min-h-screen text-center bg-background">
         <AlertCircle className="w-12 h-12 text-muted-foreground mb-4" />
         <h2 className="text-xl font-bold">No Family Found</h2>
         <p className="text-muted-foreground text-sm mt-2 mb-6">You haven't joined or created a family yet.</p>
@@ -140,7 +146,7 @@ export default function FamilyManagement() {
   }
 
   return (
-    <div className="p-6 pb-24 flex flex-col gap-6">
+    <div className="p-6 pb-24 flex flex-col gap-6 bg-background min-h-screen">
       <header>
         <h1 className="text-2xl font-bold font-headline">{familyData.name}</h1>
         <p className="text-muted-foreground text-sm">Family Governance & Settings</p>
@@ -183,53 +189,67 @@ export default function FamilyManagement() {
           <Badge variant="secondary" className="text-[10px]">{Object.keys(familyData.members).length}/10 MEMBERS</Badge>
         </div>
         <div className="space-y-3">
-          {Object.entries(familyData.members).map(([memberId, role]) => (
-            <Card key={memberId} className="border-none shadow-sm overflow-hidden">
-              <CardContent className="p-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-10 w-10 border-2 border-primary/10">
-                    <AvatarFallback className="bg-secondary text-primary font-bold">{memberId[0].toUpperCase()}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="text-sm font-bold">{memberId === user?.uid ? "You" : "Member"}</p>
-                    <div className="flex items-center gap-1">
-                      {role === 'Admin' ? <ShieldCheck className="h-3 w-3 text-primary" /> : <Shield className="h-3 w-3 text-muted-foreground" />}
-                      <span className="text-[10px] font-medium text-muted-foreground">{role as string}</span>
+          {Object.entries(familyData.members).map(([memberId, role]) => {
+            const profile = memberProfiles?.find(p => p.id === memberId);
+            const isMe = memberId === user?.uid;
+            const displayName = profile 
+              ? `${profile.firstName} ${profile.lastName}`.trim() || profile.email 
+              : (isMe ? "You" : "Loading...");
+
+            return (
+              <Card key={memberId} className="border-none shadow-sm overflow-hidden bg-card">
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10 border-2 border-primary/10">
+                      <AvatarImage src={profile?.photoUrl} />
+                      <AvatarFallback className="bg-secondary text-primary font-bold">
+                        {displayName?.[0]?.toUpperCase() || <User className="h-4 w-4" />}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="text-sm font-bold flex items-center gap-2">
+                        {displayName}
+                        {isMe && <Badge variant="outline" className="text-[8px] h-4 py-0 px-1 font-bold border-primary text-primary">YOU</Badge>}
+                      </p>
+                      <div className="flex items-center gap-1">
+                        {role === 'Admin' ? <ShieldCheck className="h-3 w-3 text-primary" /> : <Shield className="h-3 w-3 text-muted-foreground" />}
+                        <span className="text-[10px] font-medium text-muted-foreground">{role as string}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {isAdmin && (
-                  <div className="flex items-center gap-2">
-                    <Select 
-                      value={role as string} 
-                      onValueChange={(val) => handleRoleChange(memberId, val)}
-                      disabled={memberId === user?.uid && adminCount <= 1}
-                    >
-                      <SelectTrigger className="h-8 w-28 text-[10px] font-bold">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Admin">Admin</SelectItem>
-                        <SelectItem value="Co-Manager">Co-Manager</SelectItem>
-                        <SelectItem value="Member">Member</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {memberId !== user?.uid && (
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => handleRemoveMember(memberId)}
+                  {isAdmin && (
+                    <div className="flex items-center gap-2">
+                      <Select 
+                        value={role as string} 
+                        onValueChange={(val) => handleRoleChange(memberId, val)}
+                        disabled={isMe && adminCount <= 1}
                       >
-                        <UserMinus className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+                        <SelectTrigger className="h-8 w-28 text-[10px] font-bold">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Admin">Admin</SelectItem>
+                          <SelectItem value="Co-Manager">Co-Manager</SelectItem>
+                          <SelectItem value="Member">Member</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {!isMe && (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => handleRemoveMember(memberId)}
+                        >
+                          <UserMinus className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       </section>
     </div>

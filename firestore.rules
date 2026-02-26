@@ -33,7 +33,13 @@ service cloud.firestore {
      * @description Rules for individual user profiles.
      */
     match /userProfiles/{userId} {
-      allow read, write: if isOwner(userId);
+      // Allow reading if it's the owner OR if the requester is in the same family.
+      allow read: if isOwner(userId) || (
+        isSignedIn() && 
+        resource.data.familyId != null && 
+        isFamilyMember(resource.data.familyId)
+      );
+      allow write: if isOwner(userId);
     }
 
     /**
