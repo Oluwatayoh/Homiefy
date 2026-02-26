@@ -44,7 +44,8 @@ export default function LandingPage() {
   useEffect(() => {
     const biometricsEnabled = localStorage.getItem('biometric_enabled') === 'true';
     const storedEmail = localStorage.getItem('biometric_email');
-    if (biometricsEnabled && storedEmail) {
+    const storedCred = localStorage.getItem('biometric_cred');
+    if (biometricsEnabled && storedEmail && storedCred) {
       setHasBiometrics(true);
       setEmail(storedEmail);
     }
@@ -55,7 +56,6 @@ export default function LandingPage() {
   };
 
   const validatePhone = (phone: string) => {
-    // Allows + prefix, optional spaces/dashes/dots, and 10-15 digits
     return phone === '' || /^[\+]?[0-9\s\-\.]{10,15}$/.test(phone);
   };
 
@@ -76,6 +76,13 @@ export default function LandingPage() {
         special: !hasSpecialChar,
       }
     };
+  };
+
+  const saveBiometricCreds = (email: string, pass: string) => {
+    if (localStorage.getItem('biometric_enabled') === 'true') {
+      localStorage.setItem('biometric_email', email);
+      localStorage.setItem('biometric_cred', btoa(pass)); // Basic encoding for prototype demonstration
+    }
   };
 
   async function handleGoogleLogin() {
@@ -121,31 +128,17 @@ export default function LandingPage() {
 
     if (!firstName) newErrors.firstName = "First name is required";
     if (!lastName) newErrors.lastName = "Last name is required";
+    if (!validateEmail(email)) newErrors.email = "Invalid email address";
+    if (!validatePhone(phoneNumber)) newErrors.phone = "Invalid format (e.g., +1234567890)";
     
-    if (!validateEmail(email)) {
-      newErrors.email = "Invalid email address";
-    }
-
-    if (!validatePhone(phoneNumber)) {
-      newErrors.phone = "Invalid format (e.g., +1234567890)";
-    }
-
     const passStrength = validatePasswordStrength(password);
-    if (!passStrength.isValid) {
-      newErrors.password = "Requires 8+ chars, upper, lower, digit, & symbol";
-    }
+    if (!passStrength.isValid) newErrors.password = "Requires 8+ chars, upper, lower, digit, & symbol";
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      toast({ 
-        variant: "destructive", 
-        title: "Validation Error", 
-        description: "Please correct the highlighted fields." 
-      });
       return;
     }
 
-    setErrors({});
     setLoading(true);
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
@@ -161,13 +154,10 @@ export default function LandingPage() {
         role: 'Member',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        preferences: {
-          currency: 'USD',
-          alertThreshold: 80,
-          pushNotifications: true
-        }
+        preferences: { currency: 'USD', alertThreshold: 80, pushNotifications: true }
       });
       
+      saveBiometricCreds(email, password);
       toast({ title: "Welcome!", description: "Account created successfully." });
     } catch (error: any) {
       handleAuthError(error);
@@ -178,41 +168,12 @@ export default function LandingPage() {
 
   async function handleEmailLogin(e: React.FormEvent) {
     e.preventDefault();
-    if (!validateEmail(email)) {
-      toast({ variant: "destructive", title: "Invalid Email", description: "Please enter a valid email address." });
-      return;
-    }
-    if (!password) {
-      toast({ variant: "destructive", title: "Missing Password", description: "Please enter your password." });
-      return;
-    }
+    if (!validateEmail(email) || !password) return;
 
     setLoading(true);
     try {
-      const result = await signInWithEmailAndPassword(auth, email, password);
-      const user = result.user;
-      
-      const userRef = doc(db, 'userProfiles', user.uid);
-      const userSnap = await getDoc(userRef);
-      
-      if (!userSnap.exists()) {
-        await setDoc(userRef, {
-          id: user.uid,
-          firstName: 'User',
-          lastName: '',
-          email: user.email,
-          displayName: user.email?.split('@')[0] || 'User',
-          role: 'Member',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          preferences: {
-            currency: 'USD',
-            alertThreshold: 80,
-            pushNotifications: true
-          }
-        });
-      }
-      
+      await signInWithEmailAndPassword(auth, email, password);
+      saveBiometricCreds(email, password);
       toast({ title: "Welcome Back", description: "Signed in successfully." });
     } catch (error: any) {
       handleAuthError(error);
@@ -223,7 +184,11 @@ export default function LandingPage() {
 
   async function handleBiometricLogin() {
     const storedEmail = localStorage.getItem('biometric_email');
-    if (!storedEmail) return;
+    const storedCred = localStorage.getItem('biometric_cred');
+    if (!storedEmail || !storedCred) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Biometric credentials not found.' });
+      return;
+    }
 
     try {
       setLoading(true);
@@ -239,7 +204,9 @@ export default function LandingPage() {
       });
 
       if (credential) {
-        toast({ title: "Biometric Success", description: "Signing you in securely..." });
+        const decodedPass = atob(storedCred);
+        await signInWithEmailAndPassword(auth, storedEmail, decodedPass);
+        toast({ title: "Success", description: "Biometric sign-in complete." });
         router.push('/dashboard');
       }
     } catch (error: any) {
@@ -248,11 +215,7 @@ export default function LandingPage() {
       if (error.name === 'NotAllowedError') {
         message = 'Biometric sign-in is restricted by browser security policies.';
       }
-      toast({ 
-        variant: 'destructive', 
-        title: 'Biometric Failed', 
-        description: message 
-      });
+      toast({ variant: 'destructive', title: 'Biometric Failed', description: message });
     } finally {
       setLoading(false);
     }
@@ -261,15 +224,9 @@ export default function LandingPage() {
   function handleAuthError(error: any) {
     let message = 'An unexpected error occurred.';
     if (error instanceof FirebaseError) {
-      if (error.code === 'auth/operation-not-allowed') {
-        message = 'Google sign-in is not enabled.';
-      } else if (error.code === 'auth/email-already-in-use') {
-        message = 'This email is already registered.';
-      } else if (error.code === 'auth/invalid-credential') {
-        message = 'Invalid email or password.';
-      } else {
-        message = error.message;
-      }
+      if (error.code === 'auth/email-already-in-use') message = 'This email is already registered.';
+      else if (error.code === 'auth/invalid-credential') message = 'Invalid email or password.';
+      else message = error.message;
     }
     toast({ variant: 'destructive', title: 'Authentication Error', description: message });
   }
@@ -326,7 +283,7 @@ export default function LandingPage() {
                   <button
                     type="button"
                     onClick={() => setShowLoginPassword(!showLoginPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
                   >
                     {showLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -364,7 +321,6 @@ export default function LandingPage() {
                     value={firstName} 
                     onChange={(e) => setFirstName(e.target.value)} 
                   />
-                  {errors.firstName && <p className="text-[10px] text-red-500 font-medium ml-1">{errors.firstName}</p>}
                 </div>
                 <div className="space-y-1">
                   <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Last Name</Label>
@@ -374,7 +330,6 @@ export default function LandingPage() {
                     value={lastName} 
                     onChange={(e) => setLastName(e.target.value)} 
                   />
-                  {errors.lastName && <p className="text-[10px] text-red-500 font-medium ml-1">{errors.lastName}</p>}
                 </div>
               </div>
               
@@ -390,7 +345,6 @@ export default function LandingPage() {
                     onChange={(e) => setEmail(e.target.value)} 
                   />
                 </div>
-                {errors.email && <p className="text-[10px] text-red-500 font-medium ml-1">{errors.email}</p>}
               </div>
 
               <div className="space-y-1">
@@ -405,7 +359,6 @@ export default function LandingPage() {
                     onChange={(e) => setPhoneNumber(e.target.value)} 
                   />
                 </div>
-                {errors.phone && <p className="text-[10px] text-red-500 font-medium ml-1">{errors.phone}</p>}
               </div>
 
               <div className="space-y-1">
@@ -422,18 +375,12 @@ export default function LandingPage() {
                   <button
                     type="button"
                     onClick={() => setShowSignupPassword(!showSignupPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
                   >
                     {showSignupPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
-                {errors.password ? (
-                  <p className="text-[9px] text-red-500 leading-tight mt-1 ml-1">{errors.password}</p>
-                ) : (
-                  <p className="text-[9px] text-muted-foreground leading-tight mt-1 ml-1">
-                    Must include uppercase, lowercase, number, and special character.
-                  </p>
-                )}
+                {errors.password && <p className="text-[9px] text-red-500 mt-1">{errors.password}</p>}
               </div>
 
               <Button type="submit" className="w-full h-12 rounded-xl font-bold shadow-lg" disabled={loading}>

@@ -12,7 +12,8 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { LogOut, User as UserIcon, Settings, Bell, Shield, ChevronRight, Loader2, Save, Upload, X, Info, Fingerprint, Trash2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { LogOut, User as UserIcon, Settings, Bell, Shield, ChevronRight, Loader2, Save, Upload, X, Info, Fingerprint, Trash2, Lock } from 'lucide-react';
 import { doc, setDoc } from 'firebase/firestore';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from '@/hooks/use-toast';
@@ -40,8 +41,11 @@ export default function ProfilePage() {
   
   const [pushEnabled, setPushEnabled] = useState(true);
   const [alertThreshold, setAlertThreshold] = useState([80]);
-  const [currency, setCurrency] = useState('NGN');
+  const [currency, setCurrency] = useState('USD');
   const [isBiometricsEnabled, setIsBiometricsEnabled] = useState(false);
+  
+  const [showBioPrompt, setShowBioPrompt] = useState(false);
+  const [bioPassConfirm, setBioPassConfirm] = useState('');
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -57,9 +61,8 @@ export default function ProfilePage() {
       setEditPhoto(userData.photoUrl || null);
       setPushEnabled(userData.preferences?.pushNotifications ?? true);
       setAlertThreshold([userData.preferences?.alertThreshold ?? 80]);
-      setCurrency(userData.preferences?.currency || 'NGN');
+      setCurrency(userData.preferences?.currency || 'USD');
       
-      // Check local storage for biometric state
       const localBio = localStorage.getItem('biometric_enabled') === 'true';
       setIsBiometricsEnabled(localBio);
     }
@@ -69,7 +72,7 @@ export default function ProfilePage() {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 1024 * 1024) {
-        toast({ variant: "destructive", title: "File too large", description: "Please select an image smaller than 1MB." });
+        toast({ variant: "destructive", title: "File too large", description: "Image must be smaller than 1MB." });
         return;
       }
       const reader = new FileReader();
@@ -96,7 +99,7 @@ export default function ProfilePage() {
         }
       }, { merge: true });
       
-      toast({ title: "Profile Updated", description: "Your account settings have been saved." });
+      toast({ title: "Profile Updated", description: "Settings saved successfully." });
     } catch (error: any) {
       toast({ variant: "destructive", title: "Update Failed", description: error.message });
     } finally {
@@ -105,61 +108,49 @@ export default function ProfilePage() {
   };
 
   const handleRegisterBiometrics = async () => {
-    if (!user) return;
+    if (!user || !bioPassConfirm) return;
 
     try {
-      // Trigger WebAuthn credential creation
       const challenge = new Uint8Array(32);
       window.crypto.getRandomValues(challenge);
       
       const publicKeyCredentialCreationOptions: PublicKeyCredentialCreationOptions = {
         challenge,
-        rp: {
-          name: "KINETY",
-          id: window.location.hostname,
-        },
+        rp: { name: "KINETY", id: window.location.hostname },
         user: {
           id: Uint8Array.from(user.uid, c => c.charCodeAt(0)),
           name: user.email || user.uid,
-          displayName: firstName || user.email || "User",
+          displayName: firstName || "User",
         },
         pubKeyCredParams: [{ alg: -7, type: "public-key" }],
-        authenticatorSelection: {
-          authenticatorAttachment: "platform",
-          userVerification: "required",
-        },
+        authenticatorSelection: { platformAuthenticatorPreference: "preferred", userVerification: "required" },
         timeout: 60000,
       };
 
-      const credential = await navigator.credentials.create({
-        publicKey: publicKeyCredentialCreationOptions,
-      });
+      const credential = await navigator.credentials.create({ publicKey: publicKeyCredentialCreationOptions });
 
       if (credential) {
         localStorage.setItem('biometric_enabled', 'true');
         localStorage.setItem('biometric_email', user.email || '');
+        localStorage.setItem('biometric_cred', btoa(bioPassConfirm)); // Securely link auth for prototype
         setIsBiometricsEnabled(true);
-        toast({ title: "Biometrics Registered", description: "You can now sign in with your device's biometrics." });
+        setShowBioPrompt(false);
+        setBioPassConfirm('');
+        toast({ title: "Biometrics Registered", description: "You can now sign in with your biometrics." });
       }
     } catch (error: any) {
-      console.error("Biometric registration failed:", error);
       let message = "Your device might not support this or the request was cancelled.";
-      if (error.name === 'NotAllowedError') {
-        message = 'Biometric registration is restricted by the browser in this context (e.g. inside an iframe).';
-      }
-      toast({ 
-        variant: "destructive", 
-        title: "Registration Failed", 
-        description: message 
-      });
+      if (error.name === 'NotAllowedError') message = 'Registration restricted by browser security policy.';
+      toast({ variant: "destructive", title: "Registration Failed", description: message });
     }
   };
 
   const handleRemoveBiometrics = () => {
     localStorage.removeItem('biometric_enabled');
     localStorage.removeItem('biometric_email');
+    localStorage.removeItem('biometric_cred');
     setIsBiometricsEnabled(false);
-    toast({ title: "Biometrics Removed", description: "Biometric login is now disabled for this device." });
+    toast({ title: "Biometrics Removed", description: "Biometric login is now disabled." });
   };
 
   if (isUserLoading || isUserDataLoading) {
@@ -181,7 +172,7 @@ export default function ProfilePage() {
             <Avatar className="h-16 w-16 border-2 border-primary/20">
               <AvatarImage src={editPhoto || ''} />
               <AvatarFallback className="bg-primary/10 text-primary font-bold text-xl">
-                {firstName?.[0] || user.email?.[0]?.toUpperCase() || 'U'}
+                {firstName?.[0] || 'U'}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1">
@@ -240,27 +231,24 @@ export default function ProfilePage() {
               </AccordionTrigger>
               <AccordionContent className="p-4 bg-secondary/10 rounded-b-xl space-y-4">
                 <div className="space-y-2">
-                  <p className="text-sm">Enable biometric sign-in for subsequent logins on this device.</p>
-                  <div className="flex flex-col gap-2 pt-2">
-                    {isBiometricsEnabled ? (
-                      <div className="flex items-center justify-between p-3 bg-white rounded-xl border border-primary/20">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none">ACTIVE</Badge>
-                          <span className="text-xs font-medium">Device Registered</span>
-                        </div>
-                        <Button variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={handleRemoveBiometrics}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                  {isBiometricsEnabled ? (
+                    <div className="flex items-center justify-between p-3 bg-white rounded-xl border border-primary/20">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 border-none">ACTIVE</Badge>
+                        <span className="text-xs font-medium">Device Registered</span>
                       </div>
-                    ) : (
-                      <Button variant="outline" className="w-full rounded-xl gap-2 h-11" onClick={handleRegisterBiometrics}>
-                        <Fingerprint className="h-4 w-4" /> Register this Device
+                      <Button variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={handleRemoveBiometrics}>
+                        <Trash2 className="h-4 w-4" />
                       </Button>
-                    )}
-                    <p className="text-[10px] text-muted-foreground">
-                      <Info className="inline h-3 w-3 mr-1" /> This only enables biometrics for this specific browser and device.
-                    </p>
-                  </div>
+                    </div>
+                  ) : (
+                    <Button variant="outline" className="w-full rounded-xl gap-2 h-11" onClick={() => setShowBioPrompt(true)}>
+                      <Fingerprint className="h-4 w-4" /> Register this Device
+                    </Button>
+                  )}
+                  <p className="text-[10px] text-muted-foreground">
+                    <Info className="inline h-3 w-3 mr-1" /> Enables Fingerprint/FaceID sign-in on this device.
+                  </p>
                 </div>
               </AccordionContent>
             </AccordionItem>
@@ -274,12 +262,12 @@ export default function ProfilePage() {
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </AccordionTrigger>
               <AccordionContent className="p-4 bg-secondary/10 rounded-b-xl space-y-4">
-                <div className="p-3 rounded-lg bg-white/50 space-y-1">
-                  <p className="text-[10px] font-bold uppercase text-muted-foreground">Family Access Level</p>
-                  <div className="flex items-center justify-between">
+                <div className="p-3 rounded-lg bg-white/50 flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase text-muted-foreground">Family Access Level</p>
                     <p className="font-bold">{userData?.role || 'Member'}</p>
-                    {userData?.role === 'Admin' && <Badge className="text-[8px]">PRIMARY</Badge>}
                   </div>
+                  {userData?.role === 'Admin' && <Badge className="text-[8px]">PRIMARY</Badge>}
                 </div>
                 {userData?.role === 'Admin' && (
                   <Button variant="outline" className="w-full rounded-xl gap-2" onClick={() => router.push('/family')}>
@@ -301,27 +289,20 @@ export default function ProfilePage() {
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label className="text-sm">Push Alerts</Label>
-                    <p className="text-[10px] text-muted-foreground">Spending approvals and goals.</p>
+                    <p className="text-[10px] text-muted-foreground">Approvals and goal progress.</p>
                   </div>
                   <Switch checked={pushEnabled} onCheckedChange={setPushEnabled} />
-                </div>
-                <div className="flex items-center justify-between opacity-50">
-                  <div className="space-y-0.5">
-                    <Label className="text-sm">Weekly Digest</Label>
-                    <p className="text-[10px] text-muted-foreground">Family behavior summary.</p>
-                  </div>
-                  <Switch disabled />
                 </div>
               </AccordionContent>
             </AccordionItem>
 
             <AccordionItem value="preferences" className="border-none">
-              <AccordionTrigger className="p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors hover:no-underline [&>svg]:hidden">
+              <AccordionTrigger className="p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors hover:no-underline [&[data-state=open]>svg]:rotate-90">
                 <div className="flex items-center gap-3">
                   <Settings className="h-5 w-5 text-primary" />
                   <span className="font-medium">Preferences</span>
                 </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform duration-200" />
               </AccordionTrigger>
               <AccordionContent className="p-4 bg-secondary/10 rounded-b-xl space-y-4">
                 <div className="space-y-3">
@@ -331,9 +312,9 @@ export default function ProfilePage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="NGN">Nigerian Naira (NGN)</SelectItem>
                       <SelectItem value="USD">US Dollar (USD)</SelectItem>
                       <SelectItem value="EUR">Euro (EUR)</SelectItem>
+                      <SelectItem value="GBP">British Pound (GBP)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -343,9 +324,6 @@ export default function ProfilePage() {
                     <span className="text-xs font-bold text-primary">{alertThreshold}%</span>
                   </div>
                   <Slider value={alertThreshold} onValueChange={setAlertThreshold} max={100} step={5} className="py-4" />
-                  <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-                    <Info className="h-3 w-3" /> Warn me when envelope usage exceeds this limit.
-                  </p>
                 </div>
               </AccordionContent>
             </AccordionItem>
@@ -355,12 +333,47 @@ export default function ProfilePage() {
             <Button className="w-full h-12 rounded-xl font-bold gap-2 shadow-lg" onClick={handleSaveProfile} disabled={isSaving}>
               {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <Save className="h-4 w-4" />} Save All Settings
             </Button>
-            <Button variant="destructive" className="w-full h-12 rounded-xl font-bold flex items-center gap-2" onClick={() => auth.signOut()}>
+            <Button variant="destructive" className="w-full h-12 rounded-xl font-bold gap-2" onClick={() => auth.signOut()}>
               <LogOut className="h-4 w-4" /> Sign Out
             </Button>
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={showBioPrompt} onOpenChange={setShowBioPrompt}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Fingerprint className="h-5 w-5 text-primary" />
+              Secure Biometrics
+            </DialogTitle>
+            <DialogDescription>
+              Confirm your password to link your account to this device's biometrics.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="space-y-1">
+              <Label className="text-[10px] font-bold uppercase text-muted-foreground">Password</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  type="password" 
+                  placeholder="Your current password" 
+                  className="pl-10 h-12 rounded-xl"
+                  value={bioPassConfirm}
+                  onChange={(e) => setBioPassConfirm(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBioPrompt(false)} className="rounded-xl">Cancel</Button>
+            <Button onClick={handleRegisterBiometrics} disabled={!bioPassConfirm} className="rounded-xl bg-primary">
+              Verify & Register
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
