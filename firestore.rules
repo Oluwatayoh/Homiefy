@@ -19,11 +19,17 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Checks if the user is a member of the family by looking at the parent Family document.
+    // Checks if the user is a member of the family.
+    // We use get() to look up the family document and check the members map.
     function isFamilyMember(familyId) {
       return isSignedIn() && 
-        exists(/databases/$(database)/documents/families/$(familyId)) &&
         get(/databases/$(database)/documents/families/$(familyId)).data.members[request.auth.uid] != null;
+    }
+
+    // Checks if the requester and the target resource share the same familyId.
+    function areInSameFamily(resourceFamilyId) {
+      let myProfile = get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data;
+      return isSignedIn() && resourceFamilyId != null && myProfile.familyId == resourceFamilyId;
     }
 
     // --- COLLECTION RULES ---
@@ -32,13 +38,8 @@ service cloud.firestore {
      * @description Rules for individual user profiles.
      */
     match /userProfiles/{userId} {
-      // Allow reading if it's the owner OR if the requester is in the same family.
-      // This allows family members to see each other's names/photos.
-      allow read: if isOwner(userId) || (
-        isSignedIn() && 
-        resource.data.familyId != null && 
-        isFamilyMember(resource.data.familyId)
-      );
+      // Allow reading if owner OR if they are in the same family (to see names/avatars).
+      allow read: if isOwner(userId) || areInSameFamily(resource.data.familyId);
       allow write: if isOwner(userId);
     }
 
@@ -46,8 +47,11 @@ service cloud.firestore {
      * @description Rules for family units and their shared data.
      */
     match /families/{familyId} {
-      // Allow signed-in users to get/list families (necessary for joining via code)
-      allow get, list: if isSignedIn();
+      // Anyone signed in can read the basic family doc (needed for joining via code).
+      allow get: if isSignedIn();
+      
+      // Only members can list families (standard security).
+      allow list: if isSignedIn() && isFamilyMember(familyId);
       
       // Creation.
       allow create: if isSignedIn();
@@ -58,10 +62,9 @@ service cloud.firestore {
       allow update: if isSignedIn() && (
         isFamilyMember(familyId) || 
         (
-          // Case: Joining a family
-          // Ensure they only add THEMSELVES as a 'Member'
+          // Case: Joining a family. 
+          // They must add themselves as 'Member' and not change sensitive fields.
           request.resource.data.members[request.auth.uid] == 'Member' &&
-          // Ensure they don't modify critical identifying fields during the join
           request.resource.data.inviteCode == resource.data.inviteCode &&
           request.resource.data.name == resource.data.name
         )

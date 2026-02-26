@@ -33,6 +33,7 @@ export default function FamilyManagement() {
   const { data: familyData, isLoading: isFamilyDataLoading } = useDoc(familyDocRef);
 
   // Fetch all user profiles in the family to display their actual names
+  // We filter by familyId to satisfy security rules for listing profiles
   const membersQuery = useMemoFirebase(() => {
     if (!userData?.familyId) return null;
     return query(
@@ -81,7 +82,7 @@ export default function FamilyManagement() {
   const handleRoleChange = async (targetUserId: string, newRole: string) => {
     if (!familyDocRef || !isAdmin) return;
     
-    const currentRole = familyData.members[targetUserId];
+    const currentRole = familyData.members?.[targetUserId];
     if (currentRole === 'Admin' && newRole !== 'Admin' && adminCount <= 1) {
       toast({ variant: "destructive", title: "Action Blocked", description: "You must have at least one Admin in the family." });
       return;
@@ -106,7 +107,7 @@ export default function FamilyManagement() {
   const handleRemoveMember = async (targetUserId: string) => {
     if (!familyDocRef || !isAdmin) return;
     
-    const currentRole = familyData.members[targetUserId];
+    const currentRole = familyData.members?.[targetUserId];
     if (currentRole === 'Admin' && adminCount <= 1) {
       toast({ variant: "destructive", title: "Action Blocked", description: "Cannot remove the last Admin. Promote someone else first." });
       return;
@@ -149,6 +150,8 @@ export default function FamilyManagement() {
       </div>
     );
   }
+
+  const membersList = Object.entries(familyData.members || {});
 
   return (
     <div className="p-6 pb-24 flex flex-col gap-6 bg-background min-h-screen">
@@ -193,24 +196,24 @@ export default function FamilyManagement() {
       <section className="space-y-3">
         <div className="flex items-center justify-between px-1">
           <h3 className="font-semibold">Family Members</h3>
-          <Badge variant="secondary" className="text-[10px]">{Object.keys(familyData.members).length}/10 MEMBERS</Badge>
+          <Badge variant="secondary" className="text-[10px]">{membersList.length}/10 MEMBERS</Badge>
         </div>
         <div className="space-y-3">
-          {Object.entries(familyData.members).map(([memberId, role]) => {
+          {membersList.map(([memberId, role]) => {
             const profile = memberProfiles?.find(p => p.id === memberId);
             const isMe = memberId === user?.uid;
             
             // If we have profile data, use the name. Otherwise fallback to loading or UID
             const displayName = profile 
-              ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || profile.email || "Unnamed Member"
-              : (isMe ? "You" : "Loading...");
+              ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || profile.displayName || profile.email || "Unnamed Member"
+              : (isMe ? (userData?.firstName ? `${userData.firstName} ${userData.lastName}` : "You") : "Loading...");
 
             return (
               <Card key={memberId} className="border-none shadow-sm overflow-hidden bg-card">
                 <CardContent className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <Avatar className="h-10 w-10 border-2 border-primary/10">
-                      <AvatarImage src={profile?.photoUrl} />
+                      <AvatarImage src={profile?.photoUrl || userData?.photoUrl} />
                       <AvatarFallback className="bg-secondary text-primary font-bold">
                         {displayName?.[0]?.toUpperCase() || <User className="h-4 w-4" />}
                       </AvatarFallback>
