@@ -3,11 +3,13 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * KINETY SECURITY RULES
+     * HOMIEFY SECURITY RULES
      * 
      * CORE PHILOSOPHY:
      * 1. Path-based isolation for User Profiles.
      * 2. Parent-document membership check for family sub-data.
+     * 3. Authorization Independence: Every document contains its own access control map (members)
+     *    to support high-performance list operations without parent joins.
      */
 
     function isSignedIn() {
@@ -23,6 +25,11 @@ service cloud.firestore {
       return isSignedIn() && 
         exists(/databases/$(database)/documents/families/$(familyId)) &&
         get(/databases/$(database)/documents/families/$(familyId)).data.members[request.auth.uid] != null;
+    }
+
+    // Check membership based on the document's own denormalized member map.
+    function hasDocumentAccess() {
+      return isSignedIn() && resource.data.members[request.auth.uid] != null;
     }
 
     // --- COLLECTION RULES ---
@@ -50,8 +57,8 @@ service cloud.firestore {
 
       /**
        * @description Rules for family sub-data.
-       * These rely on the isFamilyMember helper which checks the parent document.
-       * For 'list' operations to succeed, the query must be restricted to the family path.
+       * These allow access if the user is a member of the parent family.
+       * This supports simple path-based queries without needing complex filters.
        */
       match /{allSubcollections=**} {
         allow read, write: if isFamilyMember(familyId);

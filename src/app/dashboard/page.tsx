@@ -65,52 +65,48 @@ export default function Dashboard() {
 
   const isStaff = userData?.role === 'Admin' || userData?.role === 'Co-Manager';
 
-  // Synchronized queries using explicit membership filters
+  // Simplified queries relying on Path-Based Parent Authorization
   const txQuery = useMemoFirebase(() => {
-    if (!userData?.familyId || !user?.uid) return null;
+    if (!userData?.familyId) return null;
     return query(
       collection(db, 'families', userData.familyId, 'transactions'),
-      where('members.' + user.uid, '!=', null),
       orderBy('date', 'desc'),
       limit(5)
     );
-  }, [userData?.familyId, user?.uid, db]);
+  }, [userData?.familyId, db]);
 
   const { data: recentTxs, isLoading: isTxsLoading } = useCollection(txQuery);
 
   const goalsQuery = useMemoFirebase(() => {
-    if (!userData?.familyId || !user?.uid) return null;
+    if (!userData?.familyId) return null;
     return query(
       collection(db, 'families', userData.familyId, 'goals'),
-      where('members.' + user.uid, '!=', null),
       orderBy('createdAt', 'desc'),
       limit(3)
     );
-  }, [userData?.familyId, user?.uid, db]);
+  }, [userData?.familyId, db]);
 
   const { data: goalsData, isLoading: isGoalsLoading } = useCollection(goalsQuery);
 
   const decisionsQuery = useMemoFirebase(() => {
-    if (!userData?.familyId || !user?.uid) return null;
+    if (!userData?.familyId) return null;
     return query(
       collection(db, 'families', userData.familyId, 'decisions'),
-      where('members.' + user.uid, '!=', null),
       orderBy('timestamp', 'desc'),
       limit(10)
     );
-  }, [userData?.familyId, user?.uid, db]);
+  }, [userData?.familyId, db]);
 
   const { data: recentDecisions } = useCollection(decisionsQuery);
 
   const approvalsQuery = useMemoFirebase(() => {
-    if (!userData?.familyId || !user?.uid) return null;
+    if (!userData?.familyId) return null;
     return query(
       collection(db, 'families', userData.familyId, 'approvals'),
-      where('members.' + user.uid, '!=', null),
       where('status', '==', 'Pending'),
       orderBy('requestedAt', 'desc')
     );
-  }, [userData?.familyId, user?.uid, db]);
+  }, [userData?.familyId, db]);
 
   const { data: pendingApprovals, isLoading: isApprovalsLoading } = useCollection(approvalsQuery);
 
@@ -216,7 +212,7 @@ export default function Dashboard() {
           familyId: userData.familyId,
           userId: selectedApproval.requesterId,
           userName: selectedApproval.requesterName,
-          members: familyData.members, // Maintain Authorization Independence
+          members: familyData.members,
           createdAt: new Date().toISOString()
         };
         await setDoc(txRef, txData);
