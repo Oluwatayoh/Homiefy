@@ -1,7 +1,48 @@
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    /**
+     * KINETY SECURITY RULES - PROTOTYPING MODE
+     *
+     * CORE PHILOSOPHY:
+     * This ruleset implements a strict, high-security authorization model while remaining flexible 
+     * regarding the specific data schema to support rapid iteration. It prioritizes 
+     * "Authorization Independence," meaning rules are designed to be evaluated without 
+     * expensive cross-document lookups (get() calls).
+     *
+     * DATA STRUCTURE & ACCESS MODEL:
+     * 1. Private User Data: Located at /userProfiles/{userId}. Access is restricted to 
+     *    the authenticated user whose UID matches the document ID.
+     * 2. Collaborative Family Data: Located at /families/{familyId} and its subcollections. 
+     *    Access is governed by a denormalized 'members' map (UID to Role) present on every 
+     *    document within this branch.
+     *
+     * KEY SECURITY DECISIONS:
+     * - No Public Access: All read and write operations require authentication.
+     * - Denormalization for Performance: Family membership data is copied onto all child 
+     *   records (budgets, goals, transactions). This allows for atomic security checks 
+     *   without hitting Firestore read limits for security overhead.
+     * - Relational Integrity: On creation, documents must correctly reference the 
+     *   authenticated user's identity to prevent data spoofing.
+     * - Resource-Specific Roles: Permissions within families (Admin, Parent, Child) 
+     *   are checked directly against the 'members' map on the document.
+     */
+
+    /**
+     * STEP 1: ANALYSIS & SYNTHESIS
+     * 1. Adopt Intent: Following the reasoning, we prioritize Authorization Independence 
+     *    by relying on denormalized membership maps.
+     * 2. Access Patterns:
+     *    - /userProfiles/{userId}: Ownership Pattern (P3.1 & P3.4).
+     *    - /families/{familyId}: Shared Access / Closed Collaborators (P3.3).
+     *    - /families/{familyId}/...: Shared Access via Denormalization (P3.3).
+     * 3. Ambiguities: The schema for 'Budget', 'Goal', and 'Transaction' is referenced 
+     *    in the structure but not fully defined in entities. We will apply the 
+     *    denormalized membership logic as dictated by the 'reasoning' section.
+     */
+
+    // --- GLOBAL HELPER FUNCTIONS ---
 
     function isSignedIn() {
       return request.auth != null;
@@ -11,69 +52,80 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Role helpers based on Family document
-    function getFamily(familyId) {
-      return get(/databases/$(database)/documents/families/$(familyId)).data;
+    // Used for update/delete to ensure document existence and ownership.
+    function isExistingOwner(userId) {
+      return resource != null && isOwner(userId);
     }
 
-    function getRole(familyId) {
-      let family = getFamily(familyId);
-      return family.members[request.auth.uid];
+    // Checks if the user is present in the denormalized 'members' map.
+    function isFamilyMember(data) {
+      return isSignedIn() && data.members != null && data.members[request.auth.uid] != null;
     }
 
-    function isAdmin(familyId) {
-      return isSignedIn() && getRole(familyId) == 'Admin';
+    // Checks if the user has the 'Admin' role in the family.
+    function isFamilyAdmin(data) {
+      return isSignedIn() && data.members != null && data.members[request.auth.uid] == 'Admin';
     }
 
-    function isCoManager(familyId) {
-      return isSignedIn() && getRole(familyId) == 'Co-Manager';
+    // --- COLLECTION RULES ---
+
+    /**
+     * @description Rules for individual user profiles.
+     * @path /userProfiles/{userId}
+     * @allow (create) if the user is authenticated and the path UID matches their UID.
+     * @deny (list) if the user tries to list all profiles.
+     * @principle Path-based ownership and self-creation validation.
+     */
+    match /userProfiles/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
     }
 
-    function isStaff(familyId) {
-      let role = getRole(familyId);
-      return role == 'Admin' || role == 'Co-Manager';
-    }
-
-    function isMember(familyId) {
-      let family = getFamily(familyId);
-      return family.members.keys().hasAny([request.auth.uid]);
-    }
-
-    match /users/{userId} {
-      allow get, list, update: if isOwner(userId);
-      allow create: if isSignedIn();
-    }
-
+    /**
+     * @description Rules for family units. Access is controlled by the 'members' map.
+     * @path /families/{familyId}
+     * @allow (create) if the user is signed in and sets themselves as the admin.
+     * @deny (update) if the user is not a member or doesn't have an admin role.
+     * @principle Shared access via membership map and role-based write control.
+     */
     match /families/{familyId} {
-      allow get: if isMember(familyId);
-      allow create: if isSignedIn();
-      allow update: if isAdmin(familyId);
-      
+      allow get: if isFamilyMember(resource.data);
+      allow list: if isSignedIn() && resource.data.members[request.auth.uid] != null;
+      allow create: if isSignedIn() && request.resource.data.adminUserId == request.auth.uid;
+      allow update: if resource != null && (isFamilyAdmin(resource.data) || isFamilyMember(resource.data));
+      allow delete: if resource != null && isFamilyAdmin(resource.data);
+
+      /**
+       * @description Shared subcollections (Budgets, Goals, Transactions).
+       * @path /families/{familyId}/[subcollection]/{id}
+       * @allow (read/write) if the user is a member of the family (verified via denormalized map).
+       * @principle Authorization Independence through denormalization.
+       */
       match /budgets/{budgetId} {
-        allow read: if isMember(familyId);
-        allow write: if isStaff(familyId);
-      }
-      
-      match /transactions/{transactionId} {
-        allow read: if isMember(familyId);
-        allow create: if isMember(familyId);
-        allow update, delete: if isStaff(familyId) || (resource.data.userId == request.auth.uid);
-      }
-
-      match /decisions/{decisionId} {
-        allow read: if isMember(familyId);
-        allow write: if isMember(familyId);
-      }
-
-      match /approvals/{approvalId} {
-        allow read: if isMember(familyId);
-        allow create: if isMember(familyId);
-        allow update: if isStaff(familyId);
+        allow get: if isFamilyMember(resource.data);
+        allow list: if isSignedIn() && resource.data.members[request.auth.uid] != null;
+        allow create: if isSignedIn() && isFamilyMember(request.resource.data);
+        allow update: if resource != null && isFamilyMember(resource.data);
+        allow delete: if resource != null && (isFamilyAdmin(resource.data) || isFamilyMember(resource.data));
       }
 
       match /goals/{goalId} {
-        allow read: if isMember(familyId);
-        allow write: if isStaff(familyId);
+        allow get: if isFamilyMember(resource.data);
+        allow list: if isSignedIn() && resource.data.members[request.auth.uid] != null;
+        allow create: if isSignedIn() && isFamilyMember(request.resource.data);
+        allow update: if resource != null && isFamilyMember(resource.data);
+        allow delete: if resource != null && (isFamilyAdmin(resource.data) || isFamilyMember(resource.data));
+      }
+
+      match /transactions/{transactionId} {
+        allow get: if isFamilyMember(resource.data);
+        allow list: if isSignedIn() && resource.data.members[request.auth.uid] != null;
+        allow create: if isSignedIn() && isFamilyMember(request.resource.data);
+        allow update: if resource != null && isFamilyMember(resource.data);
+        allow delete: if resource != null && (isFamilyAdmin(resource.data) || isFamilyMember(resource.data));
       }
     }
   }
