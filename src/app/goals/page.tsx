@@ -54,13 +54,12 @@ export default function GoalsPage() {
   const currencySymbol = getCurrencySymbol(currencyCode);
 
   const goalsQuery = useMemoFirebase(() => {
-    if (isUserDataLoading || !userData?.familyId || !user?.uid) return null;
+    if (!userData?.familyId) return null;
     return query(
       collection(db, 'families', userData.familyId, 'goals'),
-      where(`members.${user.uid}`, '!=', null),
       orderBy('createdAt', 'desc')
     );
-  }, [userData?.familyId, user?.uid, isUserDataLoading, db]);
+  }, [userData?.familyId, db]);
 
   const { data: goals, isLoading } = useCollection(goalsQuery);
 

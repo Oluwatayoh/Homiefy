@@ -65,51 +65,48 @@ export default function Dashboard() {
 
   const isStaff = userData?.role === 'Admin' || userData?.role === 'Co-Manager';
 
+  // Simplified queries relying on path-based security
   const txQuery = useMemoFirebase(() => {
-    if (isUserDataLoading || !userData?.familyId || !user?.uid) return null;
+    if (!userData?.familyId) return null;
     return query(
       collection(db, 'families', userData.familyId, 'transactions'),
-      where(`members.${user.uid}`, '!=', null),
       orderBy('date', 'desc'),
       limit(5)
     );
-  }, [userData?.familyId, user?.uid, isUserDataLoading, db]);
+  }, [userData?.familyId, db]);
 
   const { data: recentTxs, isLoading: isTxsLoading } = useCollection(txQuery);
 
   const goalsQuery = useMemoFirebase(() => {
-    if (isUserDataLoading || !userData?.familyId || !user?.uid) return null;
+    if (!userData?.familyId) return null;
     return query(
       collection(db, 'families', userData.familyId, 'goals'),
-      where(`members.${user.uid}`, '!=', null),
       orderBy('createdAt', 'desc'),
       limit(3)
     );
-  }, [userData?.familyId, user?.uid, isUserDataLoading, db]);
+  }, [userData?.familyId, db]);
 
   const { data: goalsData, isLoading: isGoalsLoading } = useCollection(goalsQuery);
 
   const decisionsQuery = useMemoFirebase(() => {
-    if (isUserDataLoading || !userData?.familyId || !user?.uid) return null;
+    if (!userData?.familyId) return null;
     return query(
       collection(db, 'families', userData.familyId, 'decisions'),
-      where(`members.${user.uid}`, '!=', null),
       orderBy('timestamp', 'desc'),
       limit(10)
     );
-  }, [userData?.familyId, user?.uid, isUserDataLoading, db]);
+  }, [userData?.familyId, db]);
 
   const { data: recentDecisions } = useCollection(decisionsQuery);
 
   const approvalsQuery = useMemoFirebase(() => {
-    if (isUserDataLoading || !userData?.familyId || !user?.uid) return null;
+    if (!userData?.familyId) return null;
     return query(
       collection(db, 'families', userData.familyId, 'approvals'),
-      where(`members.${user.uid}`, '!=', null),
       where('status', '==', 'Pending'),
       orderBy('requestedAt', 'desc')
     );
-  }, [userData?.familyId, user?.uid, isUserDataLoading, db]);
+  }, [userData?.familyId, db]);
 
   const { data: pendingApprovals, isLoading: isApprovalsLoading } = useCollection(approvalsQuery);
 

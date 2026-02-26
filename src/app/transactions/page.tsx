@@ -46,13 +46,12 @@ export default function TransactionHistory() {
   const currencySymbol = getCurrencySymbol(currencyCode);
 
   const txQuery = useMemoFirebase(() => {
-    if (isUserDataLoading || !userData?.familyId || !user?.uid) return null;
+    if (!userData?.familyId) return null;
     return query(
       collection(db, 'families', userData.familyId, 'transactions'),
-      where(`members.${user.uid}`, '!=', null),
       orderBy('date', sortOrder)
     );
-  }, [userData?.familyId, user?.uid, isUserDataLoading, db, sortOrder]);
+  }, [userData?.familyId, db, sortOrder]);
 
   const { data: transactions, isLoading } = useCollection(txQuery);
 
