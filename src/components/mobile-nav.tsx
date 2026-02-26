@@ -5,9 +5,16 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, Wallet, BrainCircuit, Target, PlusCircle, UserCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useUser } from '@/firebase';
 
 export default function MobileNav() {
   const pathname = usePathname();
+  const { user, isUserLoading } = useUser();
+
+  // Do not show the navigation if the user is not logged in or we are still checking auth state
+  if (isUserLoading || !user) {
+    return null;
+  }
 
   const navItems = [
     { icon: LayoutDashboard, label: 'Home', href: '/dashboard' },
