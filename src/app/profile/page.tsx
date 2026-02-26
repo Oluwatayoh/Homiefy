@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { LogOut, User as UserIcon, Settings, Bell, Shield, ChevronRight, Loader2, Save, Upload, X, Info } from 'lucide-react';
+import { LogOut, User as UserIcon, Settings, Bell, Shield, ChevronRight, Loader2, Save, Upload, X, Info, Fingerprint, Trash2 } from 'lucide-react';
 import { doc, setDoc } from 'firebase/firestore';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from '@/hooks/use-toast';
@@ -41,6 +41,7 @@ export default function ProfilePage() {
   const [pushEnabled, setPushEnabled] = useState(true);
   const [alertThreshold, setAlertThreshold] = useState([80]);
   const [currency, setCurrency] = useState('NGN');
+  const [isBiometricsEnabled, setIsBiometricsEnabled] = useState(false);
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -57,6 +58,10 @@ export default function ProfilePage() {
       setPushEnabled(userData.preferences?.pushNotifications ?? true);
       setAlertThreshold([userData.preferences?.alertThreshold ?? 80]);
       setCurrency(userData.preferences?.currency || 'NGN');
+      
+      // Check local storage for biometric state
+      const localBio = localStorage.getItem('biometric_enabled') === 'true';
+      setIsBiometricsEnabled(localBio);
     }
   }, [userData]);
 
@@ -97,6 +102,60 @@ export default function ProfilePage() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleRegisterBiometrics = async () => {
+    if (!user) return;
+
+    try {
+      // Trigger WebAuthn credential creation
+      const challenge = new Uint8Array(32);
+      window.crypto.getRandomValues(challenge);
+      
+      const publicKeyCredentialCreationOptions: PublicKeyCredentialCreationOptions = {
+        challenge,
+        rp: {
+          name: "KINETY",
+          id: window.location.hostname,
+        },
+        user: {
+          id: Uint8Array.from(user.uid, c => c.charCodeAt(0)),
+          name: user.email || user.uid,
+          displayName: firstName || user.email || "User",
+        },
+        pubKeyCredParams: [{ alg: -7, type: "public-key" }],
+        authenticatorSelection: {
+          authenticatorAttachment: "platform",
+          userVerification: "required",
+        },
+        timeout: 60000,
+      };
+
+      const credential = await navigator.credentials.create({
+        publicKey: publicKeyCredentialCreationOptions,
+      });
+
+      if (credential) {
+        localStorage.setItem('biometric_enabled', 'true');
+        localStorage.setItem('biometric_email', user.email || '');
+        setIsBiometricsEnabled(true);
+        toast({ title: "Biometrics Registered", description: "You can now sign in with your device's biometrics." });
+      }
+    } catch (error: any) {
+      console.error("Biometric registration failed:", error);
+      toast({ 
+        variant: "destructive", 
+        title: "Registration Failed", 
+        description: "Your device might not support this or the request was cancelled." 
+      });
+    }
+  };
+
+  const handleRemoveBiometrics = () => {
+    localStorage.removeItem('biometric_enabled');
+    localStorage.removeItem('biometric_email');
+    setIsBiometricsEnabled(false);
+    toast({ title: "Biometrics Removed", description: "Biometric login is now disabled for this device." });
   };
 
   if (isUserLoading || isUserDataLoading) {
@@ -162,6 +221,41 @@ export default function ProfilePage() {
                       <Upload className="h-4 w-4" /> Upload
                     </Button>
                     {editPhoto && <Button variant="ghost" size="sm" className="rounded-xl text-destructive" onClick={() => setEditPhoto(null)}><X className="h-4 w-4" /></Button>}
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="biometrics" className="border-none">
+              <AccordionTrigger className="p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors hover:no-underline [&>svg]:hidden">
+                <div className="flex items-center gap-3">
+                  <Fingerprint className="h-5 w-5 text-primary" />
+                  <span className="font-medium">Biometric Security</span>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </AccordionTrigger>
+              <AccordionContent className="p-4 bg-secondary/10 rounded-b-xl space-y-4">
+                <div className="space-y-2">
+                  <p className="text-sm">Enable biometric sign-in for subsequent logins on this device.</p>
+                  <div className="flex flex-col gap-2 pt-2">
+                    {isBiometricsEnabled ? (
+                      <div className="flex items-center justify-between p-3 bg-white rounded-xl border border-primary/20">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-none">ACTIVE</Badge>
+                          <span className="text-xs font-medium">Device Registered</span>
+                        </div>
+                        <Button variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={handleRemoveBiometrics}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button variant="outline" className="w-full rounded-xl gap-2 h-11" onClick={handleRegisterBiometrics}>
+                        <Fingerprint className="h-4 w-4" /> Register this Device
+                      </Button>
+                    )}
+                    <p className="text-[10px] text-muted-foreground">
+                      <Info className="inline h-3 w-3 mr-1" /> This only enables biometrics for this specific browser and device.
+                    </p>
                   </div>
                 </div>
               </AccordionContent>

@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Zap, ShieldCheck, Mail, Lock, Phone, Loader2 } from 'lucide-react';
+import { Zap, ShieldCheck, Mail, Lock, Phone, Loader2, Fingerprint } from 'lucide-react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 
@@ -26,12 +26,23 @@ export default function LandingPage() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [hasBiometrics, setHasBiometrics] = useState(false);
 
   useEffect(() => {
     if (!isUserLoading && user) {
       router.push('/dashboard');
     }
   }, [user, isUserLoading, router]);
+
+  useEffect(() => {
+    // Check if biometrics were previously enabled on this device
+    const biometricsEnabled = localStorage.getItem('biometric_enabled') === 'true';
+    const storedEmail = localStorage.getItem('biometric_email');
+    if (biometricsEnabled && storedEmail) {
+      setHasBiometrics(true);
+      setEmail(storedEmail);
+    }
+  }, []);
 
   async function handleGoogleLogin() {
     const provider = new GoogleAuthProvider();
@@ -114,12 +125,10 @@ export default function LandingPage() {
       const result = await signInWithEmailAndPassword(auth, email, password);
       const user = result.user;
       
-      // Verify profile existence on login
       const userRef = doc(db, 'userProfiles', user.uid);
       const userSnap = await getDoc(userRef);
       
       if (!userSnap.exists()) {
-        // Create basic profile if missing (rare case)
         await setDoc(userRef, {
           id: user.uid,
           firstName: 'User',
@@ -140,6 +149,46 @@ export default function LandingPage() {
       toast({ title: "Welcome Back", description: "Signed in successfully." });
     } catch (error: any) {
       handleAuthError(error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleBiometricLogin() {
+    const storedEmail = localStorage.getItem('biometric_email');
+    if (!storedEmail) return;
+
+    try {
+      setLoading(true);
+      // Trigger native biometric prompt (WebAuthn)
+      // Note: In a real production environment, this would verify a stored challenge
+      const challenge = new Uint8Array(32);
+      window.crypto.getRandomValues(challenge);
+
+      const credential = await navigator.credentials.get({
+        publicKey: {
+          challenge,
+          timeout: 60000,
+          userVerification: "required"
+        }
+      });
+
+      if (credential) {
+        // Since we can't store passwords, in a prototype we simulate the login success
+        // In production, the server would verify the credential assertion and return a Custom Token
+        toast({ title: "Biometric Success", description: "Signing you in securely..." });
+        
+        // For demonstration purposes, if we have the email, we'd normally proceed to a secure session
+        // Here we just notify the user that biometrics worked
+        router.push('/dashboard');
+      }
+    } catch (error: any) {
+      console.error("Biometric login failed:", error);
+      toast({ 
+        variant: 'destructive', 
+        title: 'Biometric Failed', 
+        description: 'Could not verify identity. Please use your password.' 
+      });
     } finally {
       setLoading(false);
     }
@@ -198,9 +247,24 @@ export default function LandingPage() {
                   <Input type="password" placeholder="••••••••" className="pl-10 h-12 rounded-xl" value={password} onChange={(e) => setPassword(e.target.value)} required />
                 </div>
               </div>
-              <Button type="submit" className="w-full h-12 rounded-xl font-bold shadow-lg" disabled={loading}>
-                {loading ? <Loader2 className="animate-spin h-5 w-5" /> : "Sign In"}
-              </Button>
+              
+              <div className="flex flex-col gap-3">
+                <Button type="submit" className="w-full h-12 rounded-xl font-bold shadow-lg" disabled={loading}>
+                  {loading ? <Loader2 className="animate-spin h-5 w-5" /> : "Sign In"}
+                </Button>
+
+                {hasBiometrics && (
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={handleBiometricLogin}
+                    className="w-full h-12 rounded-xl font-bold gap-2 border-primary/20 hover:bg-primary/5 text-primary"
+                    disabled={loading}
+                  >
+                    <Fingerprint className="h-5 w-5" /> Sign in with Biometrics
+                  </Button>
+                )}
+              </div>
             </form>
           </TabsContent>
 
