@@ -1,3 +1,22 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "family-finance",
+      "description": "A happy family discussing finances together around a laptop.",
+      "imageUrl": "https://images.unsplash.com/photo-1758686254415-9348b5b5df01?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxmYW1pbHklMjBmaW5hbmNlfGVufDB8fHx8MTc3MjEwODA4NHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "family finance"
+    },
+    {
+      "id": "financial-growth",
+      "description": "A graph showing upward financial growth and savings.",
+      "imageUrl": "https://images.unsplash.com/photo-1526628953301-3e589a6a8b74?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxmaW5hbmNpYWwlMjBncm93dGh8ZW58MHx8fHwxNzcyMDYwNzA3fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "financial growth"
+    },
+    {
+      "id": "mobile-payment",
+      "description": "A person using a smartphone for a quick mobile payment.",
+      "imageUrl": "https://images.unsplash.com/photo-1599050751795-6cdaafbc2319?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxtb2JpbGUlMjBwYXltZW50fGVufDB8fHx8MTc3MjEwODA4NHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "mobile payment"
+    }
+  ]
 }
