@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -40,6 +39,12 @@ export default function GoalsPage() {
     return user ? doc(db, 'userProfiles', user.uid) : null;
   }, [user, db]));
 
+  const familyDocRef = useMemoFirebase(() => {
+    return userData?.familyId ? doc(db, 'families', userData.familyId) : null;
+  }, [userData?.familyId, db]);
+
+  const { data: familyData } = useDoc(familyDocRef);
+
   const goalsQuery = useMemoFirebase(() => {
     if (!userData?.familyId) return null;
     return query(
@@ -51,13 +56,14 @@ export default function GoalsPage() {
   const { data: goals, isLoading } = useCollection(goalsQuery);
 
   const handleAddGoal = async () => {
-    if (!userData?.familyId || !newGoal.name || !newGoal.targetAmount) return;
+    if (!userData?.familyId || !newGoal.name || !newGoal.targetAmount || !familyData) return;
     setIsSubmitting(true);
     try {
       await addDoc(collection(db, 'families', userData.familyId, 'goals'), {
         ...newGoal,
         targetAmount: parseFloat(newGoal.targetAmount),
         currentAmount: 0,
+        members: familyData.members, // Denormalize membership for security rules
         createdAt: new Date().toISOString()
       });
       toast({ title: "Goal Created", description: "Successfully added your family financial goal." });

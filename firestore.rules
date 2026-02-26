@@ -45,13 +45,14 @@ service cloud.firestore {
     }
 
     // Checks if the user is present in the denormalized 'members' map.
+    // Enhanced to handle null data gracefully for non-existent documents.
     function isFamilyMember(data) {
-      return isSignedIn() && data.members != null && data.members[request.auth.uid] != null;
+      return isSignedIn() && data != null && data.members != null && data.members[request.auth.uid] != null;
     }
 
     // Checks if the user has the 'Admin' role in the family.
     function isFamilyAdmin(data) {
-      return isSignedIn() && data.members != null && data.members[request.auth.uid] == 'Admin';
+      return isSignedIn() && data != null && data.members != null && data.members[request.auth.uid] == 'Admin';
     }
 
     // --- COLLECTION RULES ---
@@ -59,9 +60,6 @@ service cloud.firestore {
     /**
      * @description Rules for individual user profiles.
      * @path /userProfiles/{userId}
-     * @allow (create) if the user is authenticated and the path UID matches their UID.
-     * @deny (list) if the user tries to list all profiles.
-     * @principle Path-based ownership and self-creation validation.
      */
     match /userProfiles/{userId} {
       allow get: if isOwner(userId);
@@ -72,14 +70,12 @@ service cloud.firestore {
     }
 
     /**
-     * @description Rules for family units. Access is controlled by the 'members' map.
+     * @description Rules for family units.
      * @path /families/{familyId}
-     * @allow (create) if the user is signed in and sets themselves as the admin.
-     * @deny (update) if the user is not a member or doesn't have an admin role.
-     * @principle Shared access via membership map and role-based write control.
      */
     match /families/{familyId} {
-      allow get: if isFamilyMember(resource.data);
+      // Allow 'get' if document exists and user is member, or if it doesn't exist and they are signed in.
+      allow get: if (resource == null && isSignedIn()) || isFamilyMember(resource.data);
       allow list: if isSignedIn() && resource.data.members[request.auth.uid] != null;
       allow create: if isSignedIn() && request.resource.data.adminUserId == request.auth.uid;
       allow update: if resource != null && (isFamilyAdmin(resource.data) || isFamilyMember(resource.data));
@@ -87,28 +83,12 @@ service cloud.firestore {
 
       /**
        * @description Shared subcollections (Budgets, Goals, Transactions).
-       * @path /families/{familyId}/[subcollection]/{id}
-       * @allow (read/write) if the user is a member of the family (verified via denormalized map).
-       * @principle Authorization Independence through denormalization.
+       * Subcollections must include the 'members' map for security validation.
        */
-      match /budgets/{budgetId} {
-        allow get: if isFamilyMember(resource.data);
-        allow list: if isSignedIn() && resource.data.members[request.auth.uid] != null;
-        allow create: if isSignedIn() && isFamilyMember(request.resource.data);
-        allow update: if resource != null && isFamilyMember(resource.data);
-        allow delete: if resource != null && (isFamilyAdmin(resource.data) || isFamilyMember(resource.data));
-      }
-
-      match /goals/{goalId} {
-        allow get: if isFamilyMember(resource.data);
-        allow list: if isSignedIn() && resource.data.members[request.auth.uid] != null;
-        allow create: if isSignedIn() && isFamilyMember(request.resource.data);
-        allow update: if resource != null && isFamilyMember(resource.data);
-        allow delete: if resource != null && (isFamilyAdmin(resource.data) || isFamilyMember(resource.data));
-      }
-
-      match /transactions/{transactionId} {
-        allow get: if isFamilyMember(resource.data);
+      match /{subcollection}/{id} {
+        // Allow 'get' if signed in (handles checking for non-existent docs)
+        // Data access is only granted if the document contains the member mapping.
+        allow get: if (resource == null && isSignedIn()) || isFamilyMember(resource.data);
         allow list: if isSignedIn() && resource.data.members[request.auth.uid] != null;
         allow create: if isSignedIn() && isFamilyMember(request.resource.data);
         allow update: if resource != null && isFamilyMember(resource.data);

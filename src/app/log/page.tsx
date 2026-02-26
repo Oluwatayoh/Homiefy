@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from 'react';
@@ -37,7 +36,6 @@ export default function RapidLog() {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [sentiment, setSentiment] = useState<'happy' | 'neutral' | 'unhappy' | null>(null);
   const [loading, setLoading] = useState(false);
-  const [impulseResult, setImpulseResult] = useState<ImpulseSpendingDetectionOutput | null>(null);
   
   const [showCamera, setShowCamera] = useState(false);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
@@ -133,8 +131,8 @@ export default function RapidLog() {
   };
 
   async function handleLogOrRequest() {
-    if (!desc || !isAmountValid || !category || !userData?.familyId || isFutureDate) {
-      toast({ variant: "destructive", title: "Validation Error", description: "Please ensure amount > 0 and date is not in the future." });
+    if (!desc || !isAmountValid || !category || !userData?.familyId || isFutureDate || !familyData) {
+      toast({ variant: "destructive", title: "Validation Error", description: "Please ensure all fields are valid." });
       return;
     }
     
@@ -158,6 +156,7 @@ export default function RapidLog() {
         description: desc,
         receiptPhoto: receiptPhoto || null,
         sentiment: sentiment || 'neutral',
+        members: familyData.members, // Denormalize membership for security rules
         date: new Date(date).toISOString(),
         createdAt: new Date().toISOString()
       };
@@ -186,7 +185,7 @@ export default function RapidLog() {
   }
 
   async function submitApprovalRequest() {
-    if (!userData?.familyId || !user) return;
+    if (!userData?.familyId || !user || !familyData) return;
     setLoading(true);
     
     try {
@@ -197,6 +196,7 @@ export default function RapidLog() {
         requesterName: user.displayName || 'User',
         status: 'Pending',
         justification,
+        members: familyData.members, // Denormalize membership for security rules
         requestedAt: new Date().toISOString(),
         transactionData: {
           amount: parseFloat(amount),
@@ -333,7 +333,7 @@ export default function RapidLog() {
             <ShieldAlert className="h-5 w-5 text-amber-600 shrink-0" />
             <div>
               <p className="text-xs font-bold text-amber-900">Approval Required</p>
-              <p className="text-[10px] text-amber-700">This amount exceeds your family spending threshold (\${threshold}).</p>
+              <p className="text-[10px] text-amber-700">This amount exceeds your family spending threshold (${threshold}).</p>
             </div>
           </div>
         )}

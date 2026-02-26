@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -42,6 +41,12 @@ export default function Dashboard() {
   }, [user, db]);
 
   const { data: userData, isLoading: isUserDataLoading } = useDoc(userDocRef);
+
+  const familyDocRef = useMemoFirebase(() => {
+    return userData?.familyId ? doc(db, 'families', userData.familyId) : null;
+  }, [userData?.familyId, db]);
+
+  const { data: familyData } = useDoc(familyDocRef);
 
   const currentMonthId = useMemo(() => {
     if (!mounted) return '';
@@ -157,7 +162,7 @@ export default function Dashboard() {
     const spendingRatio = budgetData.totalIncome > 0 ? totalSpent / budgetData.totalIncome : 1;
     const savingsScore = Math.max(0, 30 * (1 - spendingRatio));
     const goalScore = goalsData?.length 
-      ? (goalsData.reduce((sum, g) => sum + (g.currentAmount / g.targetAmount), 0) / goalsData.length) * 20
+      ? (goalsData.reduce((sum, g) => sum + (g.currentAmount / (g.targetAmount || 1)), 0) / goalsData.length) * 20
       : 0;
     const impulseRatio = recentDecisions?.length 
       ? recentDecisions.filter(d => d.userAction === 'proceeded' && d.aiAnalysis.regretScore > 50).length / recentDecisions.length
@@ -188,7 +193,7 @@ export default function Dashboard() {
   }, [user, isUserLoading, userData, isUserDataLoading, router]);
 
   const handleDecision = async (status: 'Approved' | 'Denied') => {
-    if (!selectedApproval || !userData?.familyId || !user) return;
+    if (!selectedApproval || !userData?.familyId || !user || !familyData) return;
     
     if (selectedApproval.requesterId === user.uid) {
       toast({ variant: "destructive", title: "Rule Violation", description: "BR8.3.2: You cannot approve your own spending request." });
@@ -213,6 +218,7 @@ export default function Dashboard() {
           familyId: userData.familyId,
           userId: selectedApproval.requesterId,
           userName: selectedApproval.requesterName,
+          members: familyData.members, // Denormalize membership for security rules
           createdAt: new Date().toISOString()
         };
         await setDoc(txRef, txData);
@@ -434,7 +440,7 @@ export default function Dashboard() {
           {goalsData && goalsData.length > 0 ? (
             <div className="space-y-3">
               {goalsData.map((goal) => {
-                const percent = Math.min(100, (goal.currentAmount / goal.targetAmount) * 100);
+                const percent = Math.min(100, (goal.currentAmount / (goal.targetAmount || 1)) * 100);
                 return (
                   <Card key={goal.id} className="border-none bg-white shadow-sm p-4 space-y-2">
                     <div className="flex justify-between items-center">
@@ -558,7 +564,7 @@ export default function Dashboard() {
                     <span className="text-xs font-bold">{item.label}</span>
                     <span className="text-[10px] font-bold text-muted-foreground">{Math.round(item.score)}/{item.max}</span>
                   </div>
-                  <Progress value={(item.score / item.max) * 100} className="h-1.5" />
+                  <Progress value={(item.score / (item.max || 1)) * 100} className="h-1.5" />
                   <p className="text-[9px] text-muted-foreground italic">{item.desc}</p>
                 </div>
               ))}

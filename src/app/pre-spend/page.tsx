@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -41,6 +40,12 @@ export default function PreSpendTool() {
 
   const { data: userData } = useDoc(userDocRef);
 
+  const familyDocRef = useMemoFirebase(() => {
+    return userData?.familyId ? doc(db, 'families', userData.familyId) : null;
+  }, [userData?.familyId, db]);
+
+  const { data: familyData } = useDoc(familyDocRef);
+
   const currentMonthId = useMemo(() => {
     if (!mounted) return '';
     return new Date().toISOString().slice(0, 7);
@@ -69,8 +74,8 @@ export default function PreSpendTool() {
   }, [budgetData]);
 
   async function handleAnalyze() {
-    if (!budgetData) {
-      toast({ variant: "destructive", title: "Active Budget Required", description: "You must have an active budget for the current month to use the Decision Intel engine." });
+    if (!budgetData || !familyData) {
+      toast({ variant: "destructive", title: "Active Family Required", description: "You must be part of a family to use the Decision Intel engine." });
       return;
     }
 
@@ -104,6 +109,7 @@ export default function PreSpendTool() {
         category,
         description: purchaseName,
         priority,
+        members: familyData.members, // Denormalize membership for security rules
         aiAnalysis: {
           impactSummary: analysis.impactSummary,
           regretScore: analysis.regretScore,

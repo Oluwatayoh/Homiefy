@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -66,6 +65,12 @@ export default function BudgetManagement() {
 
   const { data: userData } = useDoc(userDocRef);
 
+  const familyDocRef = useMemoFirebase(() => {
+    return userData?.familyId ? doc(db, 'families', userData.familyId) : null;
+  }, [userData?.familyId, db]);
+
+  const { data: familyData } = useDoc(familyDocRef);
+
   const budgetDocRef = useMemoFirebase(() => {
     return userData?.familyId && monthId ? doc(db, 'families', userData.familyId, 'budgets', monthId) : null;
   }, [userData?.familyId, db, monthId]);
@@ -74,8 +79,8 @@ export default function BudgetManagement() {
 
   useEffect(() => {
     if (budgetData) {
-      setIncome(budgetData.totalIncome.toString());
-      setEnvelopes(budgetData.envelopes || []);
+      setIncome(budgetData.totalIncome?.toString() || '');
+      setEnvelopes(budgetData.envelopes || DEFAULT_ENVELOPES.map(e => ({ ...e, spent: 0 })));
     } else {
       setIncome('');
       setEnvelopes(DEFAULT_ENVELOPES.map(e => ({ ...e, spent: 0 })));
@@ -128,7 +133,7 @@ export default function BudgetManagement() {
   };
 
   const handleSaveBudget = async () => {
-    if (!budgetDocRef || !isAdmin) return;
+    if (!budgetDocRef || !isAdmin || !familyData) return;
     if (remainingIncome < 0) {
       toast({ variant: "destructive", title: "Over Budget", description: "Allocations exceed monthly income." });
       return;
@@ -141,6 +146,7 @@ export default function BudgetManagement() {
         totalIncome: parseFloat(income),
         envelopes: envelopes,
         status: 'Active',
+        members: familyData.members, // Denormalize membership for security rules
         updatedAt: new Date().toISOString()
       };
 
