@@ -3,19 +3,21 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth, useUser } from '@/firebase';
+import { useAuth, useUser, useFirestore } from '@/firebase';
+import { FirebaseError } from 'firebase/app';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
 import { Zap, ShieldCheck, ArrowRight, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { getFirestore } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
 
 export default function LandingPage() {
   const { user, isUserLoading } = useUser();
   const auth = useAuth();
   const router = useRouter();
-  const db = getFirestore();
+  const db = useFirestore();
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!isUserLoading && user) {
@@ -51,8 +53,28 @@ export default function LandingPage() {
       } else {
         await setDoc(userRef, { lastLogin: serverTimestamp() }, { merge: true });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login failed:', error);
+      
+      let message = 'An unexpected error occurred during sign-in.';
+      
+      if (error instanceof FirebaseError) {
+        if (error.code === 'auth/operation-not-allowed') {
+          message = 'Google Sign-in is not enabled in your Firebase Console. Please go to Authentication > Sign-in method and enable Google.';
+        } else if (error.code === 'auth/popup-closed-by-user') {
+          message = 'Sign-in window was closed before completion.';
+        } else if (error.code === 'auth/cancelled-popup-request') {
+          message = 'Sign-in request was cancelled.';
+        } else {
+          message = error.message;
+        }
+      }
+
+      toast({
+        variant: 'destructive',
+        title: 'Sign-in Error',
+        description: message,
+      });
     }
   }
 
