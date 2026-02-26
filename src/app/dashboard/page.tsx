@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useMemo } from 'react';
@@ -8,7 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { TrendingUp, CheckCircle2, MoreHorizontal, Wallet, Loader2, AlertCircle } from 'lucide-react';
+import { TrendingUp, CheckCircle2, MoreHorizontal, Wallet, Loader2, AlertCircle, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function Dashboard() {
@@ -32,7 +33,7 @@ export default function Dashboard() {
 
   // Safe to Spend Calculation Logic (FR3.4)
   const stsData = useMemo(() => {
-    if (!budgetData) return { amount: 0, status: 'neutral', percentSpent: 0 };
+    if (!budgetData) return { amount: 0, status: 'neutral', percentSpent: 0, alerts: [] };
 
     const totalAllocated = budgetData.envelopes?.reduce((sum: number, e: any) => sum + (e.allocated || 0), 0) || 0;
     const totalSpent = budgetData.envelopes?.reduce((sum: number, e: any) => sum + (e.spent || 0), 0) || 0;
@@ -46,11 +47,19 @@ export default function Dashboard() {
     const amount = Math.max(0, remainingBudget / daysLeft);
     const percentSpent = totalAllocated > 0 ? (totalSpent / totalAllocated) * 100 : 0;
 
+    // Threshold Alerts (FR3.5)
+    const alerts = (budgetData.envelopes || [])
+      .filter((e: any) => (e.spent / (e.allocated || 1)) >= 0.8)
+      .map((e: any) => ({
+        name: e.name,
+        percent: Math.round((e.spent / (e.allocated || 1)) * 100)
+      }));
+
     let status = 'green';
     if (remainingBudget <= 0) status = 'red';
     else if (percentSpent > 80) status = 'yellow';
 
-    return { amount, status, percentSpent, totalAllocated, totalSpent };
+    return { amount, status, percentSpent, totalAllocated, totalSpent, alerts };
   }, [budgetData]);
 
   useEffect(() => {
@@ -102,66 +111,78 @@ export default function Dashboard() {
           <div className="mt-4 flex items-center gap-2">
             {stsData.status === 'green' && (
               <p className="text-white/90 text-xs flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" /> Budget is on track
+                <CheckCircle2 className="w-3 h-3" /> Budget is healthy
               </p>
             )}
             {stsData.status === 'yellow' && (
               <p className="text-white/90 text-xs flex items-center gap-1">
-                <AlertCircle className="w-3 h-3" /> Approaching budget limit
+                <AlertCircle className="w-3 h-3" /> Caution: Approaching limit
               </p>
             )}
             {stsData.status === 'red' && (
               <p className="text-white/90 text-xs flex items-center gap-1 font-bold">
-                <AlertCircle className="w-3 h-3" /> OVER BUDGET
+                <AlertTriangle className="w-3 h-3" /> OVER BUDGET ALERT
               </p>
             )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Shared Budget Overview */}
+      {/* Budget Alerts (FR3.5) */}
+      {stsData.alerts.length > 0 && (
+        <section className="animate-in slide-in-from-top-4 duration-500">
+          <div className="flex items-center gap-2 mb-2 px-1">
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Budget Alerts</h3>
+          </div>
+          <div className="space-y-2">
+            {stsData.alerts.map((alert, i) => (
+              <Card key={i} className="border-none bg-amber-50 shadow-sm">
+                <CardContent className="p-3 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center text-white">
+                      <AlertCircle className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold">{alert.name}</p>
+                      <p className="text-[10px] text-amber-700 font-bold uppercase">{alert.percent}% Spent</p>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => router.push('/budget')} className="h-8 text-amber-700 hover:bg-amber-100">
+                    Adjust
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Shared Budget Overview (FR3.6) */}
       <section>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold">Budget Health</h3>
-          <Badge variant="outline" className="text-[10px] font-bold">LIVE STATUS</Badge>
+        <div className="flex items-center justify-between mb-3 px-1">
+          <h3 className="font-semibold">Budget Progress</h3>
+          <Badge variant="outline" className="text-[10px] font-bold">MONTHLY</Badge>
         </div>
-        <Card className="border-none bg-white shadow-sm">
+        <Card className="border-none bg-white shadow-sm overflow-hidden">
           <CardContent className="p-4 space-y-4">
             <div className="flex justify-between items-center">
-              <span className="text-sm font-medium">Monthly Progress</span>
-              <span className="text-sm font-bold">{Math.round(stsData.percentSpent)}% spent</span>
+              <span className="text-xs font-bold text-muted-foreground uppercase">Usage</span>
+              <span className="text-sm font-bold">{Math.round(stsData.percentSpent)}%</span>
             </div>
-            <Progress value={stsData.percentSpent} className="h-2 bg-secondary" />
+            <Progress value={stsData.percentSpent} className={cn(
+              "h-2 bg-secondary",
+              stsData.percentSpent >= 100 ? "[&>div]:bg-red-500" : stsData.percentSpent >= 80 ? "[&>div]:bg-amber-500" : ""
+            )} />
             <div className="grid grid-cols-2 gap-4 pt-2">
-              <div>
-                <p className="text-muted-foreground text-[10px] uppercase font-bold tracking-wider mb-1">Total Spent</p>
-                <p className="text-lg font-bold">${stsData.totalSpent?.toFixed(2) || '0.00'}</p>
+              <div className="p-3 rounded-xl bg-secondary/30">
+                <p className="text-muted-foreground text-[10px] uppercase font-bold tracking-wider mb-1">Spent</p>
+                <p className="text-lg font-bold">${stsData.totalSpent?.toFixed(0)}</p>
               </div>
-              <div>
-                <p className="text-muted-foreground text-[10px] uppercase font-bold tracking-wider mb-1">Remaining</p>
-                <p className="text-lg font-bold">${(stsData.totalAllocated! - stsData.totalSpent!).toFixed(2)}</p>
+              <div className="p-3 rounded-xl bg-secondary/30">
+                <p className="text-muted-foreground text-[10px] uppercase font-bold tracking-wider mb-1">Budget</p>
+                <p className="text-lg font-bold">${stsData.totalAllocated?.toFixed(0)}</p>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-
-      {/* Quick Insights */}
-      <section>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold">Behavioral Insights</h3>
-          <Badge variant="secondary" className="text-[10px]">AI COACH</Badge>
-        </div>
-        <Card className="border-none bg-white shadow-sm">
-          <CardContent className="p-4 flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-              <TrendingUp className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-sm font-medium">Stability is improving!</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Your daily variation is 12% lower than last month. Consistency builds wealth.
-              </p>
             </div>
           </CardContent>
         </Card>
@@ -186,8 +207,8 @@ export default function Dashboard() {
           <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center mb-3">
             <Wallet className="h-5 w-5" />
           </div>
-          <p className="font-bold text-sm">Decision Intelligence</p>
-          <p className="text-[10px] text-muted-foreground">Pre-spend check</p>
+          <p className="font-bold text-sm">Pre-Spend</p>
+          <p className="text-[10px] text-muted-foreground">Decision check</p>
         </button>
       </div>
     </div>
