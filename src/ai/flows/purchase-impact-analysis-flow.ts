@@ -13,7 +13,11 @@ import {z} from 'genkit';
 const PurchaseImpactAnalysisInputSchema = z.object({
   purchaseName: z.string().describe('The name of the item or service being considered for purchase.'),
   purchaseAmount: z.number().positive().describe('The cost of the item or service.'),
+  category: z.string().describe('The budget category/envelope this purchase belongs to.'),
+  priority: z.enum(['Need', 'Want', 'Luxury']).optional().describe('The priority level assigned by the user.'),
   currentBudget: z.number().min(0).describe('The total remaining budget for the current period.'),
+  envelopeBalance: z.number().describe('The current remaining balance in the specific envelope for this category.'),
+  envelopeTotal: z.number().describe('The total monthly allocation for this specific envelope.'),
   currentSavings: z.number().min(0).describe('The family\'s current total savings.'),
   safeToSpendDaily: z.number().min(0).describe('The family\'s calculated daily \'safe to spend\' amount.'),
   familyGoals: z.array(
@@ -21,27 +25,31 @@ const PurchaseImpactAnalysisInputSchema = z.object({
       name: z.string().describe('The name of the financial goal.'),
       targetAmount: z.number().min(0).describe('The target amount for this goal.'),
       currentAmount: z.number().min(0).describe('The current amount saved towards this goal.'),
-      deadline: z.string().optional().describe('An optional deadline for the goal (e.g., "6 months", "next year").'),
+      deadline: z.string().optional().describe('An optional deadline for the goal.'),
     })
   ).describe('A list of the family\'s active financial goals.'),
-  impulsePurchaseLikelihood: z.number().min(0).max(1).optional().describe('An optional score (0 to 1) indicating the likelihood of this being an impulse purchase, if known.'),
 });
 export type PurchaseImpactAnalysisInput = z.infer<typeof PurchaseImpactAnalysisInputSchema>;
 
 const PurchaseImpactAnalysisOutputSchema = z.object({
   impactSummary: z.string().describe('A concise summary of the purchase\'s immediate financial impact.'),
-  budgetImpact: z.string().describe('Detailed explanation of how the purchase affects the current budget and \'safe to spend\' amount.'),
+  budgetImpactDetails: z.object({
+    remainingEnvelopeBalance: z.number().describe('The balance in the envelope if this purchase proceeds.'),
+    percentOfEnvelopeConsumed: z.number().describe('What percentage of the monthly allocation this purchase consumes.'),
+    newSafeToSpendDaily: z.number().describe('The adjusted safe-to-spend amount if this purchase proceeds.'),
+  }),
   goalImpacts: z.array(
     z.object({
       goalName: z.string().describe('The name of the affected financial goal.'),
       impactDescription: z.string().describe('Description of the impact on this specific goal.'),
-      delayEstimateInDays: z.number().int().min(0).optional().describe('Estimated delay (in days) to achieve the goal due to this purchase, if applicable.'),
+      delayEstimateInDays: z.number().int().min(0).optional().describe('Estimated delay (in days) to achieve the goal due to this purchase.'),
     })
   ).describe('A list of impacts on individual family financial goals.'),
   opportunityCost: z.string().describe('What other financial objectives or savings could be achieved with this amount instead.'),
-  regretScore: z.number().int().min(0).max(10).describe('A score from 0 (no regret) to 10 (high regret) indicating the potential for future regret.'),
+  regretScore: z.number().int().min(0).max(100).describe('A score from 0 (low) to 100 (high) predicting potential future regret based on category, amount, and current time.'),
   alternativeRecommendations: z.array(z.string()).describe('Suggestions for alternative ways to satisfy the underlying need or mitigate the purchase\'s impact.'),
-  decisionGuidance: z.string().describe('A clear, behavioral-economic-informed recommendation or guidance on whether to proceed with the purchase.'),
+  recommendationType: z.enum(['Proceed Confidently', 'Consider Carefully', 'Reconsider', 'Seek Approval']).describe('The clear, color-coded recommendation type based on FRD conditions.'),
+  decisionGuidance: z.string().describe('A 1-2 sentence supportive explanation of the recommendation.'),
 });
 export type PurchaseImpactAnalysisOutput = z.infer<typeof PurchaseImpactAnalysisOutputSchema>;
 
@@ -53,41 +61,38 @@ const prompt = ai.definePrompt({
   name: 'purchaseImpactAnalysisPrompt',
   input: {schema: PurchaseImpactAnalysisInputSchema},
   output: {schema: PurchaseImpactAnalysisOutputSchema},
-  prompt: `You are KINETY, a senior product architect, fintech strategist, behavioral economist, and family finance specialist. Your role is to guide families in making responsible financial decisions.
+  prompt: `You are KINETY, a senior financial behavior coach. Your goal is to guide families in making responsible financial decisions through empathetic, non-judgmental analysis.
 
-Analyze the following potential purchase for a family and provide a real-time, clear, and empathetic analysis of its immediate financial impact on their active goals and overall budget. Help them make a responsible decision by highlighting the financial trade-offs.
+Analyze the following potential purchase and provide a clear, supportive analysis of its impact on their budget and goals.
+
+### Potential Purchase:
+- Item: {{{purchaseName}}}
+- Cost: \${{{purchaseAmount}}}
+- Category: {{{category}}}
+- Priority: {{{priority}}}
 
 ### Family Financial Snapshot:
-- Current Total Budget Available: {{{currentBudget}}}
-- Current Total Savings: {{{currentSavings}}}
-- Daily 'Safe to Spend' Amount: {{{safeToSpendDaily}}}
-
-### Potential Purchase Details:
-- Item/Service: {{{purchaseName}}}
-- Cost: {{{purchaseAmount}}}
+- Envelope Allocation: \${{{envelopeTotal}}}
+- Current Envelope Balance: \${{{envelopeBalance}}}
+- Total Family Savings: \${{{currentSavings}}}
+- Daily 'Safe to Spend': \${{{safeToSpendDaily}}}
 
 {{#if familyGoals}}
 ### Active Family Financial Goals:
 {{#each familyGoals}}
-- Goal: {{{name}}}
-  - Target: {{{targetAmount}}}
-  - Current Progress: {{{currentAmount}}}
-  {{#if deadline}}
-  - Deadline: {{{deadline}}}
-  {{/if}}
+- Goal: {{{name}}} (Target: \${{{targetAmount}}}, Progress: \${{{currentAmount}}})
 {{/each}}
-{{else}}
-No specific family financial goals are currently active.
 {{/if}}
 
-{{#if impulsePurchaseLikelihood}}
-### Behavioral Insights:
-- Estimated Impulse Purchase Likelihood (0-1): {{{impulsePurchaseLikelihood}}}
-{{/if}}
+### Logic Guidelines:
+1. **Regret Score (0-100)**: Higher for 'Luxury' items, high amounts relative to envelope, and discretionary categories (Dining, Entertainment).
+2. **Recommendation Type**:
+   - "Proceed Confidently": Within budget, low regret, safe-to-spend stays positive.
+   - "Consider Carefully": Within budget but uses >20% of envelope, or discretionary category.
+   - "Reconsider": Uses >50% of envelope, delays goals by >7 days, high regret score.
+   - "Seek Approval": Exceeds budget envelope or puts family over total budget.
 
-Consider the family's financial well-being and long-term discipline. Provide guidance that aligns with their shared financial goals.
-
-Generate the output in the specified JSON format, making sure to provide detailed explanations for each field.`,
+Generate the output in the specified JSON format.`,
 });
 
 const purchaseImpactAnalysisFlow = ai.defineFlow(

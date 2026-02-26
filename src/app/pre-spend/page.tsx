@@ -1,94 +1,219 @@
+'use client';
 
-"use client";
-
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { purchaseImpactAnalysis, type PurchaseImpactAnalysisOutput } from '@/ai/flows/purchase-impact-analysis-flow';
 import { alternativePurchaseRecommendations, type AlternativePurchaseRecommendationsOutput } from '@/ai/flows/alternative-purchase-recommendations';
-import { FAMILY_DATA } from '@/app/lib/mock-data';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { doc, collection, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Zap, AlertTriangle, ArrowRightCircle, Target, Sparkles } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader2, Zap, AlertTriangle, ArrowRightCircle, Target, Sparkles, Brain, Clock, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
+import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 export default function PreSpendTool() {
+  const { user, isUserLoading } = useUser();
+  const db = useFirestore();
+  const { toast } = useToast();
+
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const [purchaseName, setPurchaseName] = useState('');
   const [amount, setAmount] = useState('');
+  const [category, setCategory] = useState('');
+  const [priority, setPriority] = useState<'Need' | 'Want' | 'Luxury'>('Want');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<PurchaseImpactAnalysisOutput | null>(null);
-  const [alts, setAlts] = useState<AlternativePurchaseRecommendationsOutput | null>(null);
+  const [decisionId, setDecisionId] = useState<string | null>(null);
+
+  const userDocRef = useMemoFirebase(() => {
+    return user ? doc(db, 'users', user.uid) : null;
+  }, [user, db]);
+
+  const { data: userData } = useDoc(userDocRef);
+
+  const currentMonthId = useMemo(() => {
+    if (!mounted) return '';
+    return new Date().toISOString().slice(0, 7);
+  }, [mounted]);
+
+  const budgetDocRef = useMemoFirebase(() => {
+    return userData?.familyId && currentMonthId ? doc(db, 'families', userData.familyId, 'budgets', currentMonthId) : null;
+  }, [userData?.familyId, db, currentMonthId]);
+
+  const { data: budgetData } = useDoc(budgetDocRef);
+
+  // Mocking goals for analysis context until Goal module is fully implemented
+  const mockGoals = [
+    { name: "Emergency Fund", targetAmount: 10000, currentAmount: 5000, deadline: "2025-12-01" },
+    { name: "Family Vacation", targetAmount: 3000, currentAmount: 800, deadline: "2025-06-01" }
+  ];
+
+  const stsData = useMemo(() => {
+    if (!budgetData) return { amount: 0 };
+    const totalAllocated = budgetData.envelopes?.reduce((sum: number, e: any) => sum + (e.allocated || 0), 0) || 0;
+    const totalSpent = budgetData.envelopes?.reduce((sum: number, e: any) => sum + (e.spent || 0), 0) || 0;
+    const remainingBudget = totalAllocated - totalSpent;
+    const now = new Date();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const daysLeft = (daysInMonth - now.getDate()) + 1;
+    return { amount: Math.max(0, remainingBudget / daysLeft) };
+  }, [budgetData]);
 
   async function handleAnalyze() {
-    if (!purchaseName || !amount) return;
+    if (!purchaseName || !amount || !category || !userData?.familyId) return;
     setLoading(true);
     try {
       const numericAmount = parseFloat(amount);
+      const selectedEnvelope = budgetData?.envelopes.find((e: any) => e.name === category);
+      
       const analysis = await purchaseImpactAnalysis({
         purchaseName,
         purchaseAmount: numericAmount,
-        currentBudget: FAMILY_DATA.currentBudget,
-        currentSavings: FAMILY_DATA.currentSavings,
-        safeToSpendDaily: FAMILY_DATA.safeToSpendDaily,
-        familyGoals: FAMILY_DATA.goals,
+        category,
+        priority,
+        currentBudget: budgetData?.totalIncome || 0,
+        envelopeBalance: selectedEnvelope ? (selectedEnvelope.allocated - selectedEnvelope.spent) : 0,
+        envelopeTotal: selectedEnvelope?.allocated || 0,
+        currentSavings: 15000, // Fixed mock until savings module
+        safeToSpendDaily: stsData.amount,
+        familyGoals: mockGoals,
       });
+
       setResult(analysis);
 
-      const recommendations = await alternativePurchaseRecommendations({
-        purchaseDescription: purchaseName,
-        purchaseCost: numericAmount,
-        impactAnalysis: analysis.impactSummary,
-        familyGoals: FAMILY_DATA.goals.map(g => g.name),
-      });
-      setAlts(recommendations);
-    } catch (e) {
-      console.error(e);
+      // Log decision (FR5.4)
+      const decisionRef = doc(collection(db, 'families', userData.familyId, 'decisions'));
+      const decisionData = {
+        id: decisionRef.id,
+        familyId: userData.familyId,
+        userId: user!.uid,
+        amount: numericAmount,
+        category,
+        description: purchaseName,
+        priority,
+        aiAnalysis: {
+          impactSummary: analysis.impactSummary,
+          regretScore: analysis.regretScore,
+          recommendation: analysis.decisionGuidance,
+          recommendationType: analysis.recommendationType
+        },
+        userAction: 'pending',
+        timestamp: new Date().toISOString()
+      };
+      
+      await setDoc(decisionRef, decisionData);
+      setDecisionId(decisionRef.id);
+
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Analysis Failed", description: e.message });
     } finally {
       setLoading(false);
     }
   }
 
+  async function handleAction(action: 'proceeded' | 'canceled') {
+    if (!decisionId || !userData?.familyId) return;
+    try {
+      await setDoc(doc(db, 'families', userData.familyId, 'decisions', decisionId), {
+        userAction: action
+      }, { merge: true });
+      
+      toast({ title: "Action Saved", description: `You chose to ${action}.` });
+      setResult(null);
+      setPurchaseName('');
+      setAmount('');
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Error", description: e.message });
+    }
+  }
+
+  if (isUserLoading || !mounted) return <div className="p-10 text-center"><Loader2 className="animate-spin mx-auto" /></div>;
+
   return (
-    <div className="p-6 flex flex-col gap-6">
+    <div className="p-6 pb-24 flex flex-col gap-6">
       <header>
-        <h1 className="text-2xl font-bold font-headline">Decision Intelligence</h1>
-        <p className="text-muted-foreground text-sm">Analyze impact before you spend.</p>
+        <h1 className="text-2xl font-bold font-headline">Decision Intel</h1>
+        <p className="text-muted-foreground text-sm">Pre-spending behavioral coaching.</p>
       </header>
 
       {!result ? (
         <Card className="border-none shadow-xl bg-white overflow-hidden">
           <CardHeader className="bg-primary text-white">
             <CardTitle className="flex items-center gap-2">
-              <Zap className="h-5 w-5" /> New Purchase Check
+              <Brain className="h-5 w-5" /> Spending Analysis
             </CardTitle>
             <CardDescription className="text-white/80">
-              Check how this purchase affects your family's future.
+              Check impact before you spend.
             </CardDescription>
           </CardHeader>
           <CardContent className="p-6 space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-semibold">What are you buying?</label>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">Amount</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-lg">$</span>
+                  <Input 
+                    type="number" 
+                    placeholder="0.00" 
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    className="pl-8 h-12 rounded-xl"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">Category</label>
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger className="h-12 rounded-xl">
+                    <SelectValue placeholder="Envelope" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {budgetData?.envelopes.map((e: any) => (
+                      <SelectItem key={e.id} value={e.name}>{e.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase text-muted-foreground">Item Description</label>
               <Input 
-                placeholder="e.g. New Wireless Headphones" 
+                placeholder="What are you considering?" 
                 value={purchaseName}
                 onChange={(e) => setPurchaseName(e.target.value)}
-                className="h-12"
+                className="h-12 rounded-xl"
               />
             </div>
+
             <div className="space-y-2">
-              <label className="text-sm font-semibold">Price ($)</label>
-              <Input 
-                type="number" 
-                placeholder="0.00" 
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="h-12"
-              />
+              <label className="text-[10px] font-bold uppercase text-muted-foreground">Priority Level</label>
+              <div className="flex gap-2">
+                {['Need', 'Want', 'Luxury'].map((p) => (
+                  <Button
+                    key={p}
+                    variant={priority === p ? 'default' : 'secondary'}
+                    onClick={() => setPriority(p as any)}
+                    className="flex-1 h-10 rounded-xl text-xs font-bold"
+                  >
+                    {p}
+                  </Button>
+                ))}
+              </div>
             </div>
+
             <Button 
-              className="w-full h-14 rounded-xl font-bold text-lg shadow-lg" 
+              className="w-full h-14 rounded-xl font-bold text-lg shadow-lg mt-4" 
               onClick={handleAnalyze}
-              disabled={loading || !purchaseName || !amount}
+              disabled={loading || !purchaseName || !amount || !category}
             >
               {loading ? <Loader2 className="animate-spin mr-2" /> : <Sparkles className="mr-2 h-5 w-5" />}
               Analyze Impact
@@ -98,65 +223,87 @@ export default function PreSpendTool() {
       ) : (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <Card className="border-none shadow-xl overflow-hidden">
-            <div className={`p-4 text-white flex justify-between items-center ${result.regretScore > 6 ? 'bg-destructive' : 'bg-primary'}`}>
+            <div className={cn(
+              "p-4 text-white flex justify-between items-center",
+              result.recommendationType === 'Proceed Confidently' ? 'bg-emerald-600' :
+              result.recommendationType === 'Consider Carefully' ? 'bg-amber-500' :
+              result.recommendationType === 'Reconsider' ? 'bg-orange-600' : 'bg-destructive'
+            )}>
               <div className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5" />
-                <span className="font-bold">KINETY Guidance</span>
+                <Brain className="h-5 w-5" />
+                <span className="font-bold">{result.recommendationType}</span>
               </div>
-              <Badge variant="secondary" className="bg-white/20 text-white border-none">
-                Regret Score: {result.regretScore}/10
+              <Badge variant="secondary" className="bg-white/20 text-white border-none text-[10px]">
+                Regret Score: {result.regretScore}%
               </Badge>
             </div>
+            
             <CardContent className="p-6 space-y-6">
-              <div className="space-y-2">
-                <h3 className="font-bold text-lg">Impact Summary</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{result.impactSummary}</p>
+              <div className="p-4 rounded-xl bg-secondary/30">
+                <h3 className="text-xs font-bold uppercase text-muted-foreground mb-1">Guidance</h3>
+                <p className="text-sm font-medium leading-relaxed">{result.decisionGuidance}</p>
               </div>
 
-              <div className="space-y-3">
-                <h3 className="font-bold text-sm uppercase tracking-wider text-muted-foreground">Goal Delays</h3>
-                {result.goalImpacts.map((gi, idx) => (
-                  <div key={idx} className="flex items-start gap-3 p-3 rounded-lg bg-secondary/50">
-                    <Target className="h-5 w-5 text-accent shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-xs font-bold">{gi.goalName}</p>
-                      <p className="text-[10px] text-muted-foreground">{gi.impactDescription}</p>
-                      {gi.delayEstimateInDays && (
-                        <p className="text-[10px] text-destructive font-bold mt-1">
-                          +{gi.delayEstimateInDays} days delay
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold uppercase text-muted-foreground">Impact on Envelope</p>
+                  <p className="text-lg font-bold text-primary">{result.budgetImpactDetails.percentOfEnvelopeConsumed}%</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold uppercase text-muted-foreground">Daily STS After</p>
+                  <p className="text-lg font-bold text-primary">${result.budgetImpactDetails.newSafeToSpendDaily.toFixed(2)}</p>
+                </div>
               </div>
 
-              <div className="p-4 rounded-xl bg-primary/5 border-l-4 border-primary">
-                <h3 className="font-bold text-sm mb-1">Decision Guidance</h3>
-                <p className="text-sm text-primary-foreground font-medium text-black">{result.decisionGuidance}</p>
-              </div>
-
-              {alts && (
+              {result.goalImpacts.length > 0 && (
                 <div className="space-y-3">
-                  <h3 className="font-bold text-sm uppercase tracking-wider text-muted-foreground">Smart Alternatives</h3>
-                  <div className="grid gap-2">
-                    {alts.recommendations.slice(0, 3).map((rec, idx) => (
-                      <div key={idx} className="flex items-center gap-2 text-xs font-medium bg-white border p-3 rounded-lg">
-                        <ArrowRightCircle className="h-4 w-4 text-accent" />
-                        {rec}
+                  <h3 className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Goal Analysis</h3>
+                  <div className="space-y-2">
+                    {result.goalImpacts.map((gi, idx) => (
+                      <div key={idx} className="flex items-start gap-3 p-3 rounded-lg border bg-white shadow-sm">
+                        <Target className="h-5 w-5 text-accent shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-xs font-bold">{gi.goalName}</p>
+                          <p className="text-[10px] text-muted-foreground">{gi.impactDescription}</p>
+                          {gi.delayEstimateInDays && (
+                            <Badge variant="outline" className="mt-1 h-5 text-[9px] border-destructive text-destructive font-bold">
+                              +{gi.delayEstimateInDays} days delay
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              <Button 
-                variant="outline" 
-                className="w-full"
-                onClick={() => {setResult(null); setPurchaseName(''); setAmount('');}}
-              >
-                Check Another Purchase
-              </Button>
+              <div className="space-y-3">
+                <h3 className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Smart Alternatives</h3>
+                <div className="grid gap-2">
+                  {result.alternativeRecommendations.map((rec, idx) => (
+                    <div key={idx} className="flex items-center gap-2 text-xs font-medium bg-secondary/10 p-3 rounded-lg border-l-4 border-primary">
+                      <ArrowRightCircle className="h-4 w-4 text-primary" />
+                      {rec}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2 pt-4">
+                <Button 
+                  className="h-12 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-700"
+                  onClick={() => handleAction('proceeded')}
+                >
+                  <CheckCircle2 className="mr-2 h-4 w-4" /> Proceed with Purchase
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="h-12 rounded-xl font-bold border-destructive text-destructive hover:bg-destructive/10"
+                  onClick={() => handleAction('canceled')}
+                >
+                  Cancel & Save instead
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
