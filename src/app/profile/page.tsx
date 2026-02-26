@@ -9,7 +9,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { LogOut, User as UserIcon, Settings, Bell, Shield, ChevronRight, Loader2, Save, Camera, Upload, X } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Slider } from '@/components/ui/slider';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { LogOut, User as UserIcon, Settings, Bell, Shield, ChevronRight, Loader2, Save, Camera, Upload, X, Info } from 'lucide-react';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from '@/hooks/use-toast';
@@ -34,19 +37,27 @@ export default function ProfilePage() {
   const [editName, setEditName] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editPhoto, setEditPhoto] = useState<string | null>(null);
+  
+  // Preferences & Notification State
+  const [pushEnabled, setPushEnabled] = useState(true);
+  const [alertThreshold, setAlertThreshold] = useState([80]);
+  const [currency, setCurrency] = useState('USD');
 
   useEffect(() => {
     if (userData) {
       setEditName(userData.name || '');
       setEditPhone(userData.phoneNumber || '');
       setEditPhoto(userData.photoUrl || null);
+      setPushEnabled(userData.preferences?.pushNotifications ?? true);
+      setAlertThreshold([userData.preferences?.alertThreshold ?? 80]);
+      setCurrency(userData.preferences?.currency || 'USD');
     }
   }, [userData]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 1024 * 1024) { // 1MB limit for base64 storage
+      if (file.size > 1024 * 1024) {
         toast({
           variant: "destructive",
           title: "File too large",
@@ -71,12 +82,17 @@ export default function ProfilePage() {
         name: editName,
         phoneNumber: editPhone,
         photoUrl: editPhoto,
-        lastLogin: serverTimestamp()
+        lastLogin: serverTimestamp(),
+        preferences: {
+          pushNotifications: pushEnabled,
+          alertThreshold: alertThreshold[0],
+          currency: currency
+        }
       }, { merge: true });
       
       toast({ 
         title: "Profile Updated", 
-        description: "Your personal details have been saved." 
+        description: "Your account settings have been saved." 
       });
     } catch (error: any) {
       toast({ 
@@ -144,6 +160,7 @@ export default function ProfilePage() {
           </div>
 
           <Accordion type="single" collapsible className="w-full space-y-4 border-none">
+            {/* Personal Information */}
             <AccordionItem value="personal-info" className="border-none">
               <AccordionTrigger className="flex items-center justify-between p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors hover:no-underline font-medium border-none data-[state=open]:rounded-b-none [&>svg]:hidden">
                 <div className="flex items-center gap-3">
@@ -162,7 +179,6 @@ export default function ProfilePage() {
                     placeholder="Enter your name"
                     className="rounded-xl h-11 bg-white"
                   />
-                  {!editName && <p className="text-[9px] text-amber-600 font-bold italic">Missing: Please add your name.</p>}
                 </div>
 
                 <div className="space-y-2">
@@ -178,23 +194,15 @@ export default function ProfilePage() {
                     )}
                     disabled={!!userData?.phoneNumber}
                   />
-                  {userData?.phoneNumber ? (
-                    <p className="text-[9px] text-muted-foreground font-bold italic">Mobile number is locked once set.</p>
-                  ) : (
-                    !editPhone && <p className="text-[9px] text-amber-600 font-bold italic">Missing: Please add your mobile number.</p>
+                  {userData?.phoneNumber && (
+                    <p className="text-[9px] text-muted-foreground font-bold italic">Contact support to change your verified mobile number.</p>
                   )}
                 </div>
 
                 <div className="space-y-2">
                   <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">Profile Photo</Label>
                   <div className="flex flex-col gap-3">
-                    <input 
-                      type="file" 
-                      ref={fileInputRef} 
-                      className="hidden" 
-                      accept="image/*"
-                      onChange={handleFileChange}
-                    />
+                    <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
                     <div className="flex gap-2">
                       <Button 
                         variant="outline" 
@@ -203,7 +211,7 @@ export default function ProfilePage() {
                         onClick={() => fileInputRef.current?.click()}
                         disabled={!!editPhoto}
                       >
-                        <Upload className="h-4 w-4" /> Upload New Photo
+                        <Upload className="h-4 w-4" /> Upload
                       </Button>
                       {editPhoto && (
                         <Button 
@@ -219,57 +227,121 @@ export default function ProfilePage() {
                         </Button>
                       )}
                     </div>
-                    {editPhoto ? (
-                      <p className="text-[9px] text-emerald-600 font-bold italic">Photo selected (unsaved or current).</p>
-                    ) : (
-                      <p className="text-[9px] text-amber-600 font-bold italic">No photo set. Please upload one.</p>
-                    )}
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">Email (Read-only)</Label>
-                  <Input 
-                    value={user.email || ''} 
-                    disabled
-                    className="rounded-xl h-11 bg-muted/30 text-muted-foreground"
-                  />
-                </div>
-
-                <Button 
-                  className="w-full rounded-xl h-11 font-bold gap-2 mt-2 shadow-lg" 
-                  onClick={handleSaveProfile}
-                  disabled={isSaving}
-                >
+                <Button className="w-full rounded-xl h-11 font-bold gap-2 mt-2 shadow-lg" onClick={handleSaveProfile} disabled={isSaving}>
                   {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <Save className="h-4 w-4" />}
-                  Update Profile
+                  Save Changes
                 </Button>
               </AccordionContent>
             </AccordionItem>
 
-            <div className="w-full flex items-center justify-between p-4 rounded-xl bg-secondary/30 opacity-70">
-              <div className="flex items-center gap-3">
-                <Shield className="h-5 w-5 text-primary" />
-                <span className="font-medium">Security & Roles</span>
-              </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            </div>
+            {/* Security & Roles */}
+            <AccordionItem value="security" className="border-none">
+              <AccordionTrigger className="flex items-center justify-between p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors hover:no-underline font-medium border-none data-[state=open]:rounded-b-none [&>svg]:hidden">
+                <div className="flex items-center gap-3">
+                  <Shield className="h-5 w-5 text-primary" />
+                  <span>Security & Roles</span>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform duration-200" />
+              </AccordionTrigger>
+              <AccordionContent className="p-4 bg-secondary/10 rounded-b-xl space-y-4">
+                <div className="p-4 rounded-xl bg-white border space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold">Current Role</span>
+                    <Badge variant="outline" className="border-primary text-primary">{userData?.role || 'Member'}</Badge>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Your role determines your spending limits and approval authority. 
+                    {userData?.role === 'Admin' 
+                      ? " You have full control over family governance." 
+                      : " Speak to your family Admin to request a role change."}
+                  </p>
+                  {userData?.role === 'Admin' && (
+                    <Button variant="ghost" className="w-full text-primary text-xs h-8 font-bold mt-2" onClick={() => router.push('/family')}>
+                      Manage Family Members <ChevronRight className="h-3 w-3 ml-1" />
+                    </Button>
+                  )}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
 
-            <div className="w-full flex items-center justify-between p-4 rounded-xl bg-secondary/30 opacity-70">
-              <div className="flex items-center gap-3">
-                <Bell className="h-5 w-5 text-primary" />
-                <span className="font-medium">Notifications</span>
-              </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            </div>
+            {/* Notifications */}
+            <AccordionItem value="notifications" className="border-none">
+              <AccordionTrigger className="flex items-center justify-between p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors hover:no-underline font-medium border-none data-[state=open]:rounded-b-none [&>svg]:hidden">
+                <div className="flex items-center gap-3">
+                  <Bell className="h-5 w-5 text-primary" />
+                  <span>Notifications</span>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform duration-200" />
+              </AccordionTrigger>
+              <AccordionContent className="p-4 bg-secondary/10 rounded-b-xl space-y-4">
+                <div className="space-y-4 bg-white p-4 rounded-xl border">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-sm font-bold">Push Alerts</Label>
+                      <p className="text-[10px] text-muted-foreground">Get notified of spending approvals.</p>
+                    </div>
+                    <Switch checked={pushEnabled} onCheckedChange={setPushEnabled} />
+                  </div>
+                  <div className="flex items-center justify-between opacity-50 cursor-not-allowed">
+                    <div className="space-y-0.5">
+                      <Label className="text-sm font-bold">Email Digest</Label>
+                      <p className="text-[10px] text-muted-foreground">Weekly behavioral insights.</p>
+                    </div>
+                    <Switch disabled />
+                  </div>
+                </div>
+                <Button className="w-full rounded-xl h-11 font-bold gap-2 shadow-lg" onClick={handleSaveProfile} disabled={isSaving}>
+                  {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <Save className="h-4 w-4" />}
+                  Save Preferences
+                </Button>
+              </AccordionContent>
+            </AccordionItem>
 
-            <div className="w-full flex items-center justify-between p-4 rounded-xl bg-secondary/30 opacity-70">
-              <div className="flex items-center gap-3">
-                <Settings className="h-5 w-5 text-primary" />
-                <span className="font-medium">Preferences</span>
-              </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            </div>
+            {/* Preferences */}
+            <AccordionItem value="preferences" className="border-none">
+              <AccordionTrigger className="flex items-center justify-between p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors hover:no-underline font-medium border-none data-[state=open]:rounded-b-none [&>svg]:hidden">
+                <div className="flex items-center gap-3">
+                  <Settings className="h-5 w-5 text-primary" />
+                  <span>Preferences</span>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform duration-200" />
+              </AccordionTrigger>
+              <AccordionContent className="p-4 bg-secondary/10 rounded-b-xl space-y-6">
+                <div className="space-y-4 bg-white p-4 rounded-xl border">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-bold uppercase text-muted-foreground">Personal Currency</Label>
+                    <Select value={currency} onValueChange={setCurrency}>
+                      <SelectTrigger className="h-10 rounded-lg">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="USD">USD ($)</SelectItem>
+                        <SelectItem value="EUR">EUR (€)</SelectItem>
+                        <SelectItem value="NGN">NGN (₦)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <Label className="text-[10px] font-bold uppercase text-muted-foreground">Alert Threshold</Label>
+                      <span className="text-xs font-bold text-primary">{alertThreshold[0]}%</span>
+                    </div>
+                    <Slider value={alertThreshold} onValueChange={setAlertThreshold} max={100} step={5} className="py-2" />
+                    <p className="text-[10px] text-muted-foreground italic flex items-center gap-1">
+                      <Info className="h-3 w-3" /> Notify me when I reach this % of my envelope.
+                    </p>
+                  </div>
+                </div>
+                <Button className="w-full rounded-xl h-11 font-bold gap-2 shadow-lg" onClick={handleSaveProfile} disabled={isSaving}>
+                  {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <Save className="h-4 w-4" />}
+                  Save Preferences
+                </Button>
+              </AccordionContent>
+            </AccordionItem>
           </Accordion>
 
           <Button 
