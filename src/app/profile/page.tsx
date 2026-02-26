@@ -13,11 +13,10 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { LogOut, User as UserIcon, Settings, Bell, Shield, ChevronRight, Loader2, Save, Camera, Upload, X, Info } from 'lucide-react';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { LogOut, User as UserIcon, Settings, Bell, Shield, ChevronRight, Loader2, Save, Upload, X, Info } from 'lucide-react';
+import { doc, setDoc } from 'firebase/firestore';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
 
 export default function ProfilePage() {
   const { user, isUserLoading } = useUser();
@@ -42,7 +41,7 @@ export default function ProfilePage() {
   
   const [pushEnabled, setPushEnabled] = useState(true);
   const [alertThreshold, setAlertThreshold] = useState([80]);
-  const [currency, setCurrency] = useState('USD');
+  const [currency, setCurrency] = useState('NGN');
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -58,7 +57,7 @@ export default function ProfilePage() {
       setEditPhoto(userData.photoUrl || null);
       setPushEnabled(userData.preferences?.pushNotifications ?? true);
       setAlertThreshold([userData.preferences?.alertThreshold ?? 80]);
-      setCurrency(userData.preferences?.currency || 'USD');
+      setCurrency(userData.preferences?.currency || 'NGN');
     }
   }, [userData]);
 
@@ -132,50 +131,137 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <Accordion type="single" collapsible className="w-full space-y-4 border-none">
+          <Accordion type="single" collapsible className="w-full space-y-4">
             <AccordionItem value="personal-info" className="border-none">
-              <AccordionTrigger className="flex items-center justify-between p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors hover:no-underline font-medium border-none [&>svg]:hidden">
+              <AccordionTrigger className="p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors hover:no-underline [&>svg]:hidden">
                 <div className="flex items-center gap-3">
                   <UserIcon className="h-5 w-5 text-primary" />
-                  <span>Personal Information</span>
+                  <span className="font-medium">Personal Information</span>
                 </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform duration-200" />
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </AccordionTrigger>
               <AccordionContent className="p-4 bg-secondary/10 rounded-b-xl space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">First Name</Label>
-                    <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} className="rounded-xl h-11 bg-white" />
+                    <Label className="text-[10px] font-bold uppercase text-muted-foreground">First Name</Label>
+                    <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} className="rounded-xl" />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">Last Name</Label>
-                    <Input value={lastName} onChange={(e) => setLastName(e.target.value)} className="rounded-xl h-11 bg-white" />
+                    <Label className="text-[10px] font-bold uppercase text-muted-foreground">Last Name</Label>
+                    <Input value={lastName} onChange={(e) => setLastName(e.target.value)} className="rounded-xl" />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">Mobile Number</Label>
-                  <Input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} disabled={!!userData?.phoneNumber} className="rounded-xl h-11 bg-white" />
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground">Mobile Number</Label>
+                  <Input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} disabled={!!userData?.phoneNumber} className="rounded-xl" />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">Profile Photo</Label>
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground">Profile Photo</Label>
                   <div className="flex gap-2">
                     <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
-                    <Button variant="outline" size="sm" className="rounded-xl flex-1 gap-2 bg-white" onClick={() => fileInputRef.current?.click()} disabled={!!editPhoto}>
+                    <Button variant="outline" size="sm" className="rounded-xl flex-1 gap-2" onClick={() => fileInputRef.current?.click()} disabled={!!editPhoto}>
                       <Upload className="h-4 w-4" /> Upload
                     </Button>
                     {editPhoto && <Button variant="ghost" size="sm" className="rounded-xl text-destructive" onClick={() => setEditPhoto(null)}><X className="h-4 w-4" /></Button>}
                   </div>
                 </div>
-                <Button className="w-full rounded-xl h-11 font-bold gap-2 mt-2 shadow-lg" onClick={handleSaveProfile} disabled={isSaving}>
-                  {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <Save className="h-4 w-4" />} Save Changes
-                </Button>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="security" className="border-none">
+              <AccordionTrigger className="p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors hover:no-underline [&>svg]:hidden">
+                <div className="flex items-center gap-3">
+                  <Shield className="h-5 w-5 text-primary" />
+                  <span className="font-medium">Security & Roles</span>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </AccordionTrigger>
+              <AccordionContent className="p-4 bg-secondary/10 rounded-b-xl space-y-4">
+                <div className="p-3 rounded-lg bg-white/50 space-y-1">
+                  <p className="text-[10px] font-bold uppercase text-muted-foreground">Family Access Level</p>
+                  <div className="flex items-center justify-between">
+                    <p className="font-bold">{userData?.role || 'Member'}</p>
+                    {userData?.role === 'Admin' && <Badge className="text-[8px]">PRIMARY</Badge>}
+                  </div>
+                </div>
+                {userData?.role === 'Admin' && (
+                  <Button variant="outline" className="w-full rounded-xl gap-2" onClick={() => router.push('/family')}>
+                    <Settings className="h-4 w-4" /> Manage Family Governance
+                  </Button>
+                )}
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="notifications" className="border-none">
+              <AccordionTrigger className="p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors hover:no-underline [&>svg]:hidden">
+                <div className="flex items-center gap-3">
+                  <Bell className="h-5 w-5 text-primary" />
+                  <span className="font-medium">Notifications</span>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </AccordionTrigger>
+              <AccordionContent className="p-4 bg-secondary/10 rounded-b-xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm">Push Alerts</Label>
+                    <p className="text-[10px] text-muted-foreground">Spending approvals and goals.</p>
+                  </div>
+                  <Switch checked={pushEnabled} onCheckedChange={setPushEnabled} />
+                </div>
+                <div className="flex items-center justify-between opacity-50">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm">Weekly Digest</Label>
+                    <p className="text-[10px] text-muted-foreground">Family behavior summary.</p>
+                  </div>
+                  <Switch disabled />
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="preferences" className="border-none">
+              <AccordionTrigger className="p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors hover:no-underline [&>svg]:hidden">
+                <div className="flex items-center gap-3">
+                  <Settings className="h-5 w-5 text-primary" />
+                  <span className="font-medium">Preferences</span>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </AccordionTrigger>
+              <AccordionContent className="p-4 bg-secondary/10 rounded-b-xl space-y-4">
+                <div className="space-y-3">
+                  <Label className="text-[10px] font-bold uppercase text-muted-foreground">Base Currency</Label>
+                  <Select value={currency} onValueChange={setCurrency}>
+                    <SelectTrigger className="rounded-xl h-11 bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="NGN">Nigerian Naira (NGN)</SelectItem>
+                      <SelectItem value="USD">US Dollar (USD)</SelectItem>
+                      <SelectItem value="EUR">Euro (EUR)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <Label className="text-[10px] font-bold uppercase text-muted-foreground">Alert Threshold</Label>
+                    <span className="text-xs font-bold text-primary">{alertThreshold}%</span>
+                  </div>
+                  <Slider value={alertThreshold} onValueChange={setAlertThreshold} max={100} step={5} className="py-4" />
+                  <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                    <Info className="h-3 w-3" /> Warn me when envelope usage exceeds this limit.
+                  </p>
+                </div>
               </AccordionContent>
             </AccordionItem>
           </Accordion>
 
-          <Button variant="destructive" className="w-full h-12 rounded-xl mt-8 font-bold flex items-center gap-2" onClick={() => auth.signOut()}>
-            <LogOut className="h-4 w-4" /> Sign Out
-          </Button>
+          <div className="mt-8 space-y-3">
+            <Button className="w-full h-12 rounded-xl font-bold gap-2 shadow-lg" onClick={handleSaveProfile} disabled={isSaving}>
+              {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <Save className="h-4 w-4" />} Save All Settings
+            </Button>
+            <Button variant="destructive" className="w-full h-12 rounded-xl font-bold flex items-center gap-2" onClick={() => auth.signOut()}>
+              <LogOut className="h-4 w-4" /> Sign Out
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

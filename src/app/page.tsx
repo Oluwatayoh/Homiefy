@@ -10,11 +10,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Zap, ShieldCheck, ArrowRight, Loader2, Mail, Lock, User, Phone } from 'lucide-react';
-import Image from 'next/image';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { Zap, ShieldCheck, Mail, Lock, Phone, Loader2 } from 'lucide-react';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
 
 export default function LandingPage() {
   const { user, isUserLoading } = useUser();
@@ -59,12 +57,13 @@ export default function LandingPage() {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           preferences: {
-            currency: 'USD',
+            currency: 'NGN',
             alertThreshold: 80,
             pushNotifications: true
           }
         });
       }
+      toast({ title: "Welcome!", description: "Signed in with Google." });
     } catch (error: any) {
       handleAuthError(error);
     } finally {
@@ -94,7 +93,7 @@ export default function LandingPage() {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         preferences: {
-          currency: 'USD',
+          currency: 'NGN',
           alertThreshold: 80,
           pushNotifications: true
         }
@@ -123,15 +122,12 @@ export default function LandingPage() {
   }
 
   function handleAuthError(error: any) {
-    console.error('Auth error:', error);
     let message = 'An unexpected error occurred.';
     if (error instanceof FirebaseError) {
       if (error.code === 'auth/operation-not-allowed') {
-        message = 'Authentication provider not enabled. Please check Firebase Console.';
+        message = 'Google sign-in is not enabled. Please enable it in the Firebase Console.';
       } else if (error.code === 'auth/email-already-in-use') {
         message = 'This email is already registered.';
-      } else if (error.code === 'auth/weak-password') {
-        message = 'Password should be at least 6 characters.';
       } else if (error.code === 'auth/invalid-credential') {
         message = 'Invalid email or password.';
       } else {
@@ -142,11 +138,7 @@ export default function LandingPage() {
   }
 
   if (isUserLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
+    return <div className="flex items-center justify-center min-h-screen"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
   }
 
   return (
@@ -172,28 +164,14 @@ export default function LandingPage() {
                 <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Email</Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    type="email" 
-                    placeholder="name@example.com" 
-                    className="pl-10 h-12 rounded-xl"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
+                  <Input type="email" placeholder="name@example.com" className="pl-10 h-12 rounded-xl" value={email} onChange={(e) => setEmail(e.target.value)} required />
                 </div>
               </div>
               <div className="space-y-1">
                 <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Password</Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    type="password" 
-                    placeholder="••••••••" 
-                    className="pl-10 h-12 rounded-xl"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
+                  <Input type="password" placeholder="••••••••" className="pl-10 h-12 rounded-xl" value={password} onChange={(e) => setPassword(e.target.value)} required />
                 </div>
               </div>
               <Button type="submit" className="w-full h-12 rounded-xl font-bold shadow-lg" disabled={loading}>
@@ -207,59 +185,27 @@ export default function LandingPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">First Name</Label>
-                  <Input 
-                    placeholder="Jane" 
-                    className="h-12 rounded-xl"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    required
-                  />
+                  <Input placeholder="Jane" className="h-12 rounded-xl" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Last Name</Label>
-                  <Input 
-                    placeholder="Doe" 
-                    className="h-12 rounded-xl"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    required
-                  />
+                  <Input placeholder="Doe" className="h-12 rounded-xl" value={lastName} onChange={(e) => setLastName(e.target.value)} required />
                 </div>
               </div>
               <div className="space-y-1">
                 <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Email</Label>
-                <Input 
-                  type="email" 
-                  placeholder="name@example.com" 
-                  className="h-12 rounded-xl"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
+                <Input type="email" placeholder="name@example.com" className="h-12 rounded-xl" value={email} onChange={(e) => setEmail(e.target.value)} required />
               </div>
               <div className="space-y-1">
-                <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Phone (Optional)</Label>
+                <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Phone</Label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    type="tel" 
-                    placeholder="+234..." 
-                    className="pl-10 h-12 rounded-xl"
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                  />
+                  <Input type="tel" placeholder="+234..." className="pl-10 h-12 rounded-xl" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} />
                 </div>
               </div>
               <div className="space-y-1">
                 <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Password</Label>
-                <Input 
-                  type="password" 
-                  placeholder="Min 6 characters" 
-                  className="h-12 rounded-xl"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
+                <Input type="password" placeholder="Min 6 characters" className="h-12 rounded-xl" value={password} onChange={(e) => setPassword(e.target.value)} required />
               </div>
               <Button type="submit" className="w-full h-12 rounded-xl font-bold shadow-lg" disabled={loading}>
                 {loading ? <Loader2 className="animate-spin h-5 w-5" /> : "Create Account"}
@@ -270,15 +216,10 @@ export default function LandingPage() {
 
         <div className="relative">
           <div className="absolute inset-0 flex items-center"><span className="w-full border-t"></span></div>
-          <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-muted-foreground font-bold">Or continue with</span></div>
+          <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-muted-foreground font-bold">Or</span></div>
         </div>
 
-        <Button 
-          variant="outline" 
-          onClick={handleGoogleLogin} 
-          className="w-full h-12 rounded-xl font-bold gap-2 border-2" 
-          disabled={loading}
-        >
+        <Button variant="outline" onClick={handleGoogleLogin} className="w-full h-12 rounded-xl font-bold gap-2 border-2" disabled={loading}>
           {loading ? <Loader2 className="animate-spin h-5 w-5" /> : (
             <>
               <svg className="h-5 w-5" viewBox="0 0 24 24">
