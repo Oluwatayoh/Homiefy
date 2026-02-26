@@ -1,17 +1,20 @@
+
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { impulseSpendingDetection, type ImpulseSpendingDetectionOutput } from '@/ai/flows/impulse-spending-detection';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, doc, updateDoc } from 'firebase/firestore';
+import { collection, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Plus, Smile, Meh, Frown, Sparkles, Brain, Camera, X } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Loader2, Plus, Smile, Meh, Frown, Sparkles, Brain, Camera, X, ShieldAlert } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -40,6 +43,9 @@ export default function RapidLog() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [justification, setJustification] = useState('');
+
   const currentMonthId = useMemo(() => {
     if (!mounted) return '';
     return new Date().toISOString().slice(0, 7);
@@ -51,6 +57,12 @@ export default function RapidLog() {
 
   const { data: userData } = useDoc(userDocRef);
 
+  const familyDocRef = useMemoFirebase(() => {
+    return userData?.familyId ? doc(db, 'families', userData.familyId) : null;
+  }, [userData?.familyId, db]);
+
+  const { data: familyData } = useDoc(familyDocRef);
+
   const budgetDocRef = useMemoFirebase(() => {
     return userData?.familyId && currentMonthId ? doc(db, 'families', userData.familyId, 'budgets', currentMonthId) : null;
   }, [userData?.familyId, db, currentMonthId]);
@@ -58,6 +70,17 @@ export default function RapidLog() {
   const { data: budgetData } = useDoc(budgetDocRef);
 
   const envelopes = budgetData?.envelopes || [];
+
+  const threshold = useMemo(() => {
+    if (!familyData || !userData) return Infinity;
+    if (userData.role === 'Admin') return Infinity;
+    return familyData.approvalThresholds?.[userData.role as 'Member' | 'Co-Manager'] || 0;
+  }, [familyData, userData]);
+
+  const isOverThreshold = useMemo(() => {
+    const val = parseFloat(amount);
+    return !isNaN(val) && val > threshold;
+  }, [amount, threshold]);
 
   useEffect(() => {
     if (showCamera) {
@@ -69,7 +92,6 @@ export default function RapidLog() {
             videoRef.current.srcObject = stream;
           }
         } catch (error) {
-          console.error('Error accessing camera:', error);
           setHasCameraPermission(false);
           toast({
             variant: 'destructive',
@@ -99,14 +121,20 @@ export default function RapidLog() {
     }
   };
 
-  async function handleSubmit() {
+  async function handleLogOrRequest() {
     if (!desc || !amount || !category || !userData?.familyId) return;
-    setLoading(true);
     
+    if (isOverThreshold) {
+      setShowApprovalModal(true);
+      return;
+    }
+
+    setLoading(true);
     const numericAmount = parseFloat(amount);
     const familyId = userData.familyId;
 
     try {
+      // Detection only if user opted in or by default? FRD says "AI decision engine" is a feature.
       const result = await impulseSpendingDetection({
         transactionDetails: desc,
         amount: numericAmount,
@@ -154,6 +182,45 @@ export default function RapidLog() {
     }
   }
 
+  async function submitApprovalRequest() {
+    if (!userData?.familyId || !user) return;
+    setLoading(true);
+    
+    try {
+      const approvalsRef = collection(db, 'families', userData.familyId, 'approvals');
+      const requestData = {
+        familyId: userData.familyId,
+        requesterId: user.uid,
+        requesterName: user.displayName || 'User',
+        status: 'Pending',
+        justification,
+        requestedAt: new Date().toISOString(),
+        transactionData: {
+          amount: parseFloat(amount),
+          category,
+          description: desc,
+          receiptPhoto: receiptPhoto || null,
+          sentiment: sentiment || 'neutral',
+          date: new Date().toISOString()
+        }
+      };
+
+      await addDoc(approvalsRef, requestData);
+      
+      toast({
+        title: "Request Submitted",
+        description: "Your spending request is pending approval.",
+      });
+
+      router.push('/dashboard');
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Request Failed", description: e.message });
+    } finally {
+      setLoading(false);
+      setShowApprovalModal(false);
+    }
+  }
+
   if (isUserLoading || !mounted) return <div className="p-10 text-center"><Loader2 className="animate-spin mx-auto" /></div>;
 
   return (
@@ -188,7 +255,6 @@ export default function RapidLog() {
                 {envelopes.map(e => (
                   <SelectItem key={e.id} value={e.name}>{e.name}</SelectItem>
                 ))}
-                {envelopes.length === 0 && <SelectItem value="Uncategorized" disabled>Setup budget first</SelectItem>}
               </SelectContent>
             </Select>
           </div>
@@ -248,15 +314,54 @@ export default function RapidLog() {
           </div>
         </div>
 
+        {isOverThreshold && (
+          <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3">
+            <ShieldAlert className="h-5 w-5 text-amber-600 shrink-0" />
+            <div>
+              <p className="text-xs font-bold text-amber-900">Approval Required</p>
+              <p className="text-[10px] text-amber-700">This amount exceeds your family spending threshold (\${threshold}).</p>
+            </div>
+          </div>
+        )}
+
         <Button 
-          className="w-full h-14 rounded-xl text-lg font-bold shadow-lg mt-4"
-          onClick={handleSubmit}
+          className={cn(
+            "w-full h-14 rounded-xl text-lg font-bold shadow-lg mt-4",
+            isOverThreshold ? "bg-amber-600 hover:bg-amber-700" : ""
+          )}
+          onClick={handleLogOrRequest}
           disabled={loading || !desc || !amount || !category}
         >
-          {loading ? <Loader2 className="animate-spin mr-2" /> : <Plus className="mr-2 h-5 w-5" />}
-          Log Transaction
+          {loading ? <Loader2 className="animate-spin mr-2" /> : isOverThreshold ? <ShieldAlert className="mr-2 h-5 w-5" /> : <Plus className="mr-2 h-5 w-5" />}
+          {isOverThreshold ? "Request Approval" : "Log Transaction"}
         </Button>
       </Card>
+
+      <Dialog open={showApprovalModal} onOpenChange={setShowApprovalModal}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Spending Justification</DialogTitle>
+            <DialogDescription>
+              Explain why this purchase is necessary to your family leads.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Textarea 
+              placeholder="e.g. Urgent car repair needed for work commute." 
+              value={justification}
+              onChange={(e) => setJustification(e.target.value)}
+              className="min-h-[100px] rounded-xl"
+              maxLength={200}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowApprovalModal(false)} className="rounded-xl">Cancel</Button>
+            <Button onClick={submitApprovalRequest} disabled={loading} className="rounded-xl bg-amber-600">
+              Submit Request
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {showCamera && (
         <div className="fixed inset-0 bg-black z-[100] flex flex-col">
@@ -284,18 +389,6 @@ export default function RapidLog() {
         </div>
       )}
       <canvas ref={canvasRef} className="hidden" />
-
-      {impulseResult && (
-        <Card className={`border-none shadow-lg animate-in fade-in zoom-in duration-300 overflow-hidden ${impulseResult.isImpulsePurchase ? 'bg-amber-50' : 'bg-green-50'}`}>
-          <div className="p-4 flex items-center gap-3">
-            <Brain className={`h-6 w-6 ${impulseResult.isImpulsePurchase ? 'text-amber-600' : 'text-green-600'}`} />
-            <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Behavioral Insight</p>
-              <p className="text-sm font-semibold">{impulseResult.insight}</p>
-            </div>
-          </div>
-        </Card>
-      )}
     </div>
   );
 }

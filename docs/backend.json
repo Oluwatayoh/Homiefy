@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -116,6 +117,26 @@
         "userAction": { "type": "string", "enum": ["proceeded", "canceled", "pending"] },
         "timestamp": { "type": "string", "format": "date-time" }
       }
+    },
+    "Approval": {
+      "title": "Approval",
+      "type": "object",
+      "description": "A request for spending approval.",
+      "properties": {
+        "id": { "type": "string" },
+        "familyId": { "type": "string" },
+        "requesterId": { "type": "string" },
+        "requesterName": { "type": "string" },
+        "approverId": { "type": "string" },
+        "transactionData": { "type": "object" },
+        "justification": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Denied"] },
+        "approverReason": { "type": "string" },
+        "approvedAmount": { "type": "number" },
+        "requestedAt": { "type": "string", "format": "date-time" },
+        "resolvedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["familyId", "requesterId", "transactionData", "status", "requestedAt"]
     }
   },
   "auth": {
@@ -161,6 +182,14 @@
           "entityName": "Decision",
           "schema": { "$ref": "#/backend/entities/Decision" },
           "description": "Spending decisions."
+        }
+      },
+      {
+        "path": "/families/{familyId}/approvals/{approvalId}",
+        "definition": {
+          "entityName": "Approval",
+          "schema": { "$ref": "#/backend/entities/Approval" },
+          "description": "Spending approval requests."
         }
       }
     ]
