@@ -42,8 +42,10 @@ service cloud.firestore {
      * @description Rules for family units and their shared data.
      */
     match /families/{familyId} {
-      // Allow any signed-in user to 'get' or 'list' families (necessary for joining via code).
-      allow get, list: if isSignedIn();
+      // Allow any signed-in user to 'get' families (necessary for joining via ID)
+      // Allow 'list' only for joining via invite code search
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
       
       // Only the creator can create the family.
       allow create: if isSignedIn() && request.resource.data.adminUserId == request.auth.uid;
@@ -53,14 +55,21 @@ service cloud.firestore {
       allow delete: if isSignedIn() && get(/databases/$(database)/documents/families/$(familyId)).data.members[request.auth.uid] == 'Admin';
 
       /**
-       * @description Recursive match for all family subcollections (Budgets, Goals, Transactions, Approvals, Decisions).
-       * Access is granted if the user is a member of the family.
+       * @description Rules for family sub-data.
+       * We use explicit matches for better clarity and performance in list operations.
        */
-      match /{allSubcollections=**} {
-        // We use the parent family membership check for all sub-data.
-        // For 'list' operations, Firestore requires the query to be restricted to the familyId path and matching filters.
-        allow get, list: if isMemberOfFamily(familyId);
-        allow create, update, delete: if isMemberOfFamily(familyId);
+      
+      // Approvals, Transactions, Goals, Budgets, Decisions
+      match /{subCollection}/{docId} {
+        // For list operations, the query must be filtered by the user's membership.
+        // We allow list if the document's own members map contains the user, or if they are a family member.
+        allow list: if isSignedIn() && (
+          resource.data.members[request.auth.uid] != null ||
+          isMemberOfFamily(familyId)
+        );
+        
+        // Single document access and mutations require family membership.
+        allow get, create, update, delete: if isMemberOfFamily(familyId);
       }
     }
   }

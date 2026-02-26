@@ -59,49 +59,50 @@ export default function Dashboard() {
 
   const { data: budgetData, isLoading: isBudgetLoading } = useDoc(budgetDocRef);
 
+  const isStaff = userData?.role === 'Admin' || userData?.role === 'Co-Manager';
+
   const txQuery = useMemoFirebase(() => {
-    if (!userData?.familyId || !user?.uid) return null;
+    if (isUserDataLoading || !userData?.familyId || !user?.uid) return null;
     return query(
       collection(db, 'families', userData.familyId, 'transactions'),
       where(`members.${user.uid}`, '!=', null),
       orderBy('date', 'desc'),
       limit(5)
     );
-  }, [userData?.familyId, user?.uid, db]);
+  }, [userData?.familyId, user?.uid, isUserDataLoading, db]);
 
   const { data: recentTxs, isLoading: isTxsLoading } = useCollection(txQuery);
 
   const goalsQuery = useMemoFirebase(() => {
-    if (!userData?.familyId || !user?.uid) return null;
+    if (isUserDataLoading || !userData?.familyId || !user?.uid) return null;
     return query(
       collection(db, 'families', userData.familyId, 'goals'),
       where(`members.${user.uid}`, '!=', null),
       orderBy('createdAt', 'desc'),
       limit(3)
     );
-  }, [userData?.familyId, user?.uid, db]);
+  }, [userData?.familyId, user?.uid, isUserDataLoading, db]);
 
   const { data: goalsData, isLoading: isGoalsLoading } = useCollection(goalsQuery);
 
   const decisionsQuery = useMemoFirebase(() => {
-    if (!userData?.familyId || !user?.uid) return null;
+    if (isUserDataLoading || !userData?.familyId || !user?.uid) return null;
     return query(
       collection(db, 'families', userData.familyId, 'decisions'),
       where(`members.${user.uid}`, '!=', null),
       orderBy('timestamp', 'desc'),
       limit(10)
     );
-  }, [userData?.familyId, user?.uid, db]);
+  }, [userData?.familyId, user?.uid, isUserDataLoading, db]);
 
   const { data: recentDecisions } = useCollection(decisionsQuery);
 
-  const isStaff = userData?.role === 'Admin' || userData?.role === 'Co-Manager';
-
   const approvalsQuery = useMemoFirebase(() => {
-    if (!userData?.familyId || !user?.uid) return null;
+    if (isUserDataLoading || !userData?.familyId || !user?.uid) return null;
     
     const baseCol = collection(db, 'families', userData.familyId, 'approvals');
     
+    // Explicitly filter by membership to satisfy security rules (Rules are not filters)
     if (isStaff) {
       return query(
         baseCol,
@@ -118,7 +119,7 @@ export default function Dashboard() {
         orderBy('requestedAt', 'desc')
       );
     }
-  }, [userData?.familyId, user?.uid, isStaff, db]);
+  }, [userData?.familyId, user?.uid, isUserDataLoading, isStaff, db]);
 
   const { data: pendingApprovals, isLoading: isApprovalsLoading } = useCollection(approvalsQuery);
 
