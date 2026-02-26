@@ -5,34 +5,14 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "User",
       "type": "object",
-      "description": "Represents a user account within the KINETY system, associated with a Google OAuth identity and family role.",
+      "description": "Represents a user account within the KINETY system.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the User entity (Firebase UID)."
-        },
-        "email": {
-          "type": "string",
-          "description": "Email address of the user.",
-          "format": "email"
-        },
-        "name": {
-          "type": "string",
-          "description": "Display name of the user."
-        },
-        "photoUrl": {
-          "type": "string",
-          "description": "Profile photo URL or Base64 string."
-        },
-        "familyId": {
-          "type": "string",
-          "description": "ID of the family the user belongs to."
-        },
-        "role": {
-          "type": "string",
-          "enum": ["Admin", "Co-Manager", "Member", "Child"],
-          "description": "Role within the family."
-        },
+        "id": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "name": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "familyId": { "type": "string" },
+        "role": { "type": "string", "enum": ["Admin", "Co-Manager", "Member", "Child"] },
         "preferences": {
           "type": "object",
           "properties": {
@@ -41,14 +21,8 @@
             "pushNotifications": { "type": "boolean" }
           }
         },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "lastLogin": {
-          "type": "string",
-          "format": "date-time"
-        }
+        "createdAt": { "type": "string", "format": "date-time" },
+        "lastLogin": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "email", "name", "role", "createdAt", "lastLogin"]
     },
@@ -70,14 +44,35 @@
             "Co-Manager": { "type": "number" }
           }
         },
-        "members": {
-          "type": "object",
-          "description": "Map of userId to role for fast lookups."
-        },
+        "members": { "type": "object" },
         "createdBy": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "name", "inviteCode", "currency", "members", "createdBy", "createdAt"]
+    },
+    "Budget": {
+      "title": "Budget",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Usually YYYY-MM format" },
+        "totalIncome": { "type": "number" },
+        "status": { "type": "string", "enum": ["Active", "Closed"] },
+        "envelopes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "icon": { "type": "string" },
+              "allocated": { "type": "number" },
+              "spent": { "type": "number" }
+            }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
     }
   },
   "auth": {
@@ -99,6 +94,14 @@
           "entityName": "Family",
           "schema": { "$ref": "#/backend/entities/Family" },
           "description": "Family data."
+        }
+      },
+      {
+        "path": "/families/{familyId}/budgets/{budgetId}",
+        "definition": {
+          "entityName": "Budget",
+          "schema": { "$ref": "#/backend/entities/Budget" },
+          "description": "Monthly family budgets."
         }
       }
     ]
