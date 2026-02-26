@@ -60,63 +60,57 @@ export default function Dashboard() {
   const { data: budgetData, isLoading: isBudgetLoading } = useDoc(budgetDocRef);
 
   const txQuery = useMemoFirebase(() => {
-    if (!userData?.familyId || !user) return null;
+    if (!userData?.familyId) return null;
     return query(
       collection(db, 'families', userData.familyId, 'transactions'),
-      where(`members.${user.uid}`, '!=', null),
-      orderBy(`members.${user.uid}`), // Group by member for index optimization
       orderBy('date', 'desc'),
       limit(5)
     );
-  }, [userData?.familyId, user, db]);
+  }, [userData?.familyId, db]);
 
   const { data: recentTxs, isLoading: isTxsLoading } = useCollection(txQuery);
 
   const goalsQuery = useMemoFirebase(() => {
-    if (!userData?.familyId || !user) return null;
+    if (!userData?.familyId) return null;
     return query(
       collection(db, 'families', userData.familyId, 'goals'),
-      where(`members.${user.uid}`, '!=', null),
       orderBy('createdAt', 'desc'),
       limit(3)
     );
-  }, [userData?.familyId, user, db]);
+  }, [userData?.familyId, db]);
 
   const { data: goalsData, isLoading: isGoalsLoading } = useCollection(goalsQuery);
 
   const decisionsQuery = useMemoFirebase(() => {
-    if (!userData?.familyId || !user) return null;
+    if (!userData?.familyId) return null;
     return query(
       collection(db, 'families', userData.familyId, 'decisions'),
-      where(`members.${user.uid}`, '!=', null),
       orderBy('timestamp', 'desc'),
       limit(10)
     );
-  }, [userData?.familyId, user, db]);
+  }, [userData?.familyId, db]);
 
   const { data: recentDecisions } = useCollection(decisionsQuery);
 
   const isStaff = userData?.role === 'Admin' || userData?.role === 'Co-Manager';
 
   const approvalsQuery = useMemoFirebase(() => {
-    if (!userData?.familyId || !user) return null;
+    if (!userData?.familyId) return null;
     if (isStaff) {
       return query(
         collection(db, 'families', userData.familyId, 'approvals'),
-        where(`members.${user.uid}`, '!=', null),
         where('status', '==', 'Pending'),
         orderBy('requestedAt', 'desc')
       );
     } else {
       return query(
         collection(db, 'families', userData.familyId, 'approvals'),
-        where(`members.${user.uid}`, '!=', null),
-        where('requesterId', '==', user.uid),
+        where('requesterId', '==', user?.uid),
         where('status', '==', 'Pending'),
         orderBy('requestedAt', 'desc')
       );
     }
-  }, [userData?.familyId, user, isStaff, db]);
+  }, [userData?.familyId, user?.uid, isStaff, db]);
 
   const { data: pendingApprovals, isLoading: isApprovalsLoading } = useCollection(approvalsQuery);
 
@@ -171,7 +165,7 @@ export default function Dashboard() {
       ? (goalsData.reduce((sum, g) => sum + (g.currentAmount / (g.targetAmount || 1)), 0) / goalsData.length) * 20
       : 0;
     const impulseRatio = recentDecisions?.length 
-      ? recentDecisions.filter(d => d.userAction === 'proceeded' && d.aiAnalysis.regretScore > 50).length / recentDecisions.length
+      ? recentDecisions.filter(d => d.userAction === 'proceeded' && d.aiAnalysis?.regretScore > 50).length / recentDecisions.length
       : 0;
     const impulseScore = 10 * (1 - impulseRatio);
 
@@ -416,8 +410,8 @@ export default function Dashboard() {
                       <ShieldCheck className="h-4 w-4" />
                     </div>
                     <div>
-                      <p className="text-xs font-bold">{req.transactionData.description || req.transactionData.category}</p>
-                      <p className="text-[10px] text-muted-foreground">{req.requesterName} • ${req.transactionData.amount.toFixed(2)}</p>
+                      <p className="text-xs font-bold">{req.transactionData?.description || req.transactionData?.category}</p>
+                      <p className="text-[10px] text-muted-foreground">{req.requesterName} • ${req.transactionData?.amount?.toFixed(2)}</p>
                     </div>
                   </div>
                   <Badge variant="outline" className="text-[8px] border-amber-300 text-amber-700">REVIEW</Badge>
@@ -604,11 +598,11 @@ export default function Dashboard() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 rounded-xl bg-secondary/30">
                   <p className="text-[10px] font-bold uppercase text-muted-foreground">Amount</p>
-                  <p className="text-xl font-bold">${selectedApproval.transactionData.amount.toFixed(2)}</p>
+                  <p className="text-xl font-bold">${selectedApproval.transactionData?.amount?.toFixed(2)}</p>
                 </div>
                 <div className="p-3 rounded-xl bg-secondary/30">
                   <p className="text-[10px] font-bold uppercase text-muted-foreground">Category</p>
-                  <p className="text-lg font-bold">{selectedApproval.transactionData.category}</p>
+                  <p className="text-lg font-bold">{selectedApproval.transactionData?.category}</p>
                 </div>
               </div>
 

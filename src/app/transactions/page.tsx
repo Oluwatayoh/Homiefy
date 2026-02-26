@@ -36,14 +36,12 @@ export default function TransactionHistory() {
   const { data: userData } = useDoc(userDocRef);
 
   const txQuery = useMemoFirebase(() => {
-    if (!userData?.familyId || !user) return null;
+    if (!userData?.familyId) return null;
     return query(
       collection(db, 'families', userData.familyId, 'transactions'),
-      where(`members.${user.uid}`, '!=', null),
-      orderBy(`members.${user.uid}`),
       orderBy('date', sortOrder)
     );
-  }, [userData?.familyId, user, db, sortOrder]);
+  }, [userData?.familyId, db, sortOrder]);
 
   const { data: transactions, isLoading } = useCollection(txQuery);
 
@@ -142,7 +140,7 @@ export default function TransactionHistory() {
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-sm font-bold text-primary">${tx.amount.toFixed(2)}</p>
+                <p className="text-sm font-bold text-primary">${tx.amount?.toFixed(2)}</p>
                 <Badge variant="secondary" className="text-[8px] px-1 py-0 h-4">
                   {tx.category}
                 </Badge>
@@ -171,7 +169,7 @@ export default function TransactionHistory() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 rounded-xl bg-secondary/30">
                   <p className="text-[10px] font-bold uppercase text-muted-foreground">Amount</p>
-                  <p className="text-xl font-bold">${selectedTx.amount.toFixed(2)}</p>
+                  <p className="text-xl font-bold">${selectedTx.amount?.toFixed(2)}</p>
                 </div>
                 <div className="p-3 rounded-xl bg-secondary/30">
                   <p className="text-[10px] font-bold uppercase text-muted-foreground">Category</p>

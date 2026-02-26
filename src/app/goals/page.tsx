@@ -46,13 +46,12 @@ export default function GoalsPage() {
   const { data: familyData } = useDoc(familyDocRef);
 
   const goalsQuery = useMemoFirebase(() => {
-    if (!userData?.familyId || !user) return null;
+    if (!userData?.familyId) return null;
     return query(
       collection(db, 'families', userData.familyId, 'goals'),
-      where(`members.${user.uid}`, '!=', null),
       orderBy('createdAt', 'desc')
     );
-  }, [userData?.familyId, user, db]);
+  }, [userData?.familyId, db]);
 
   const { data: goals, isLoading } = useCollection(goalsQuery);
 

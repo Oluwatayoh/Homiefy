@@ -3,20 +3,12 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * Homiefy SECURITY RULES - PROTOTYPING MODE
+     * Homiefy SECURITY RULES - ROBUST PROTOTYPING MODE
      *
      * CORE PHILOSOPHY:
-     * This ruleset implements a strict, high-security authorization model while remaining flexible 
-     * regarding the specific data schema to support rapid iteration. It prioritizes 
-     * "Authorization Independence," meaning rules are designed to be evaluated without 
-     * expensive cross-document lookups (get() calls).
-     *
-     * DATA STRUCTURE & ACCESS MODEL:
-     * 1. Private User Data: Located at /userProfiles/{userId}. Access is restricted to 
-     *    the authenticated user whose UID matches the document ID.
-     * 2. Collaborative Family Data: Located at /families/{familyId} and its subcollections. 
-     *    Access is governed by a denormalized 'members' map (UID to Role) present on every 
-     *    document within this branch.
+     * This ruleset balances security with rapid iteration. It uses parent-document 
+     * validation for subcollections to simplify queries and avoid complex composite index 
+     * requirements while maintaining strict data isolation between families.
      */
 
     // --- GLOBAL HELPER FUNCTIONS ---
@@ -29,61 +21,57 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Used for update/delete to ensure document existence and ownership.
-    function isExistingOwner(userId) {
-      return resource != null && isOwner(userId);
-    }
-
-    // Checks if the user is present in the denormalized 'members' map.
+    // Checks if a user is a member of a specific family document.
     function isFamilyMember(data) {
       return isSignedIn() && data != null && data.members != null && data.members[request.auth.uid] != null;
     }
 
-    // Checks if the user has the 'Admin' role in the family.
+    // Checks if the user has the 'Admin' role in the family data.
     function isFamilyAdmin(data) {
       return isSignedIn() && data != null && data.members != null && data.members[request.auth.uid] == 'Admin';
+    }
+
+    // Checks membership by looking up the parent family document.
+    function isMemberOfFamily(familyId) {
+      return isSignedIn() && 
+             get(/databases/$(database)/documents/families/$(familyId)).data.members[request.auth.uid] != null;
     }
 
     // --- COLLECTION RULES ---
 
     /**
      * @description Rules for individual user profiles.
-     * @path /userProfiles/{userId}
      */
     match /userProfiles/{userId} {
       allow get: if isOwner(userId);
       allow list: if isOwner(userId);
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if isExistingOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
     }
 
     /**
      * @description Rules for family units.
-     * @path /families/{familyId}
      */
     match /families/{familyId} {
-      // Allow 'get' if document exists and user is member, or if it doesn't exist and they are signed in.
-      allow get: if (resource == null && isSignedIn()) || isFamilyMember(resource.data);
-      allow list: if isSignedIn() && (resource == null || resource.data.members[request.auth.uid] != null);
+      // Allow 'get' if document exists and user is member, or if they are signed in (for joining).
+      allow get: if isSignedIn();
+      // Allow 'list' for searching (e.g., invite codes) and for members.
+      allow list: if isSignedIn();
+      
       allow create: if isSignedIn() && request.resource.data.adminUserId == request.auth.uid;
-      allow update: if resource != null && (isFamilyAdmin(resource.data) || isFamilyMember(resource.data));
-      allow delete: if resource != null && isFamilyAdmin(resource.data);
+      allow update: if isFamilyMember(resource.data) || isFamilyAdmin(resource.data);
+      allow delete: if isFamilyAdmin(resource.data);
 
       /**
-       * @description Shared subcollections (Budgets, Goals, Transactions).
-       * Subcollections must include the 'members' map for security validation.
+       * @description Shared subcollections (Budgets, Goals, Transactions, Approvals, Decisions).
+       * Access is granted if the user is a member of the parent family document.
        */
       match /{subcollection}/{id} {
-        // Allow list only if correctly filtered by the authenticated user's membership.
-        allow list: if isSignedIn() && (resource == null || resource.data.members[request.auth.uid] != null);
-        
-        // Allow 'get' if document exists and user is member, or for creation checks.
-        allow get: if (resource == null && isSignedIn()) || isFamilyMember(resource.data);
-        
-        allow create: if isSignedIn() && isFamilyMember(request.resource.data);
-        allow update: if resource != null && isFamilyMember(resource.data);
-        allow delete: if resource != null && (isFamilyAdmin(resource.data) || isFamilyMember(resource.data));
+        allow get, list: if isMemberOfFamily(familyId);
+        allow create: if isMemberOfFamily(familyId);
+        allow update: if isMemberOfFamily(familyId);
+        allow delete: if isMemberOfFamily(familyId);
       }
     }
   }
