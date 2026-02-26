@@ -13,7 +13,7 @@ import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { LogOut, User as UserIcon, Settings, Bell, Shield, ChevronRight, Loader2, Save, Upload, X, Info, Fingerprint, Trash2, Lock, Mail, Phone } from 'lucide-react';
+import { LogOut, User as UserIcon, Settings, Bell, Shield, ChevronRight, Loader2, Save, Upload, X, Info, Fingerprint, Trash2, Lock, Mail, Phone, RefreshCcw } from 'lucide-react';
 import { doc, setDoc } from 'firebase/firestore';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from '@/hooks/use-toast';
@@ -155,6 +155,17 @@ export default function ProfilePage() {
     localStorage.removeItem('biometric_cred');
     setIsBiometricsEnabled(false);
     toast({ title: "Biometrics Removed", description: "Biometric login is now disabled." });
+  };
+
+  const handleSignOut = async () => {
+    try {
+      localStorage.clear();
+      await auth.signOut();
+      router.push('/');
+      toast({ title: "Signed Out", description: "You have been securely logged out." });
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Logout Failed", description: error.message });
+    }
   };
 
   if (isUserLoading || isUserDataLoading) {
@@ -340,9 +351,11 @@ export default function ProfilePage() {
             <Button className="w-full h-12 rounded-xl font-bold gap-2 shadow-lg" onClick={handleSaveProfile} disabled={isSaving}>
               {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <Save className="h-4 w-4" />} Save All Settings
             </Button>
-            <Button variant="destructive" className="w-full h-12 rounded-xl font-bold gap-2" onClick={() => auth.signOut()}>
-              <LogOut className="h-4 w-4" /> Sign Out
-            </Button>
+            <div className="grid grid-cols-1 gap-2">
+              <Button variant="outline" className="h-12 rounded-xl font-bold gap-2 text-muted-foreground" onClick={handleSignOut}>
+                <LogOut className="h-4 w-4" /> Sign Out
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
