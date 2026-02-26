@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, addDoc, doc } from 'firebase/firestore';
+import { collection, query, orderBy, addDoc, doc, where } from 'firebase/firestore';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -46,12 +46,13 @@ export default function GoalsPage() {
   const { data: familyData } = useDoc(familyDocRef);
 
   const goalsQuery = useMemoFirebase(() => {
-    if (!userData?.familyId) return null;
+    if (!userData?.familyId || !user) return null;
     return query(
       collection(db, 'families', userData.familyId, 'goals'),
+      where(`members.${user.uid}`, '!=', null),
       orderBy('createdAt', 'desc')
     );
-  }, [userData?.familyId, db]);
+  }, [userData?.familyId, user, db]);
 
   const { data: goals, isLoading } = useCollection(goalsQuery);
 
@@ -63,7 +64,7 @@ export default function GoalsPage() {
         ...newGoal,
         targetAmount: parseFloat(newGoal.targetAmount),
         currentAmount: 0,
-        members: familyData.members, // Denormalize membership for security rules
+        members: familyData.members,
         createdAt: new Date().toISOString()
       });
       toast({ title: "Goal Created", description: "Successfully added your family financial goal." });

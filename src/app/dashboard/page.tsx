@@ -60,57 +60,63 @@ export default function Dashboard() {
   const { data: budgetData, isLoading: isBudgetLoading } = useDoc(budgetDocRef);
 
   const txQuery = useMemoFirebase(() => {
-    if (!userData?.familyId) return null;
+    if (!userData?.familyId || !user) return null;
     return query(
       collection(db, 'families', userData.familyId, 'transactions'),
+      where(`members.${user.uid}`, '!=', null),
+      orderBy(`members.${user.uid}`), // Group by member for index optimization
       orderBy('date', 'desc'),
       limit(5)
     );
-  }, [userData?.familyId, db]);
+  }, [userData?.familyId, user, db]);
 
   const { data: recentTxs, isLoading: isTxsLoading } = useCollection(txQuery);
 
   const goalsQuery = useMemoFirebase(() => {
-    if (!userData?.familyId) return null;
+    if (!userData?.familyId || !user) return null;
     return query(
       collection(db, 'families', userData.familyId, 'goals'),
+      where(`members.${user.uid}`, '!=', null),
       orderBy('createdAt', 'desc'),
       limit(3)
     );
-  }, [userData?.familyId, db]);
+  }, [userData?.familyId, user, db]);
 
   const { data: goalsData, isLoading: isGoalsLoading } = useCollection(goalsQuery);
 
   const decisionsQuery = useMemoFirebase(() => {
-    if (!userData?.familyId) return null;
+    if (!userData?.familyId || !user) return null;
     return query(
       collection(db, 'families', userData.familyId, 'decisions'),
+      where(`members.${user.uid}`, '!=', null),
       orderBy('timestamp', 'desc'),
       limit(10)
     );
-  }, [userData?.familyId, db]);
+  }, [userData?.familyId, user, db]);
 
   const { data: recentDecisions } = useCollection(decisionsQuery);
 
   const isStaff = userData?.role === 'Admin' || userData?.role === 'Co-Manager';
 
   const approvalsQuery = useMemoFirebase(() => {
-    if (!userData?.familyId) return null;
+    if (!userData?.familyId || !user) return null;
     if (isStaff) {
       return query(
         collection(db, 'families', userData.familyId, 'approvals'),
+        where(`members.${user.uid}`, '!=', null),
         where('status', '==', 'Pending'),
         orderBy('requestedAt', 'desc')
       );
     } else {
       return query(
         collection(db, 'families', userData.familyId, 'approvals'),
-        where('requesterId', '==', user?.uid),
+        where(`members.${user.uid}`, '!=', null),
+        where('requesterId', '==', user.uid),
         where('status', '==', 'Pending'),
         orderBy('requestedAt', 'desc')
       );
     }
-  }, [userData?.familyId, db, isStaff, user?.uid]);
+  }, [userData?.familyId, user, isStaff, db]);
 
   const { data: pendingApprovals, isLoading: isApprovalsLoading } = useCollection(approvalsQuery);
 
@@ -127,7 +133,7 @@ export default function Dashboard() {
       breakdown: { adherenceScore: 0, savingsScore: 0, goalScore: 0, impulseScore: 0 }
     };
 
-    const totalAllocated = budgetData.envelopes?.reduce((sum: number, e: any) => sum + (e.allocated || 0), 0) || 0;
+    const totalAllocated = budgetData.totalIncome || 0;
     const totalSpent = budgetData.envelopes?.reduce((sum: number, e: any) => sum + (e.spent || 0), 0) || 0;
     const remainingBudget = totalAllocated - totalSpent;
 
@@ -196,7 +202,7 @@ export default function Dashboard() {
     if (!selectedApproval || !userData?.familyId || !user || !familyData) return;
     
     if (selectedApproval.requesterId === user.uid) {
-      toast({ variant: "destructive", title: "Rule Violation", description: "BR8.3.2: You cannot approve your own spending request." });
+      toast({ variant: "destructive", title: "Rule Violation", description: "You cannot approve your own spending request." });
       return;
     }
 
@@ -218,7 +224,7 @@ export default function Dashboard() {
           familyId: userData.familyId,
           userId: selectedApproval.requesterId,
           userName: selectedApproval.requesterName,
-          members: familyData.members, // Denormalize membership for security rules
+          members: familyData.members,
           createdAt: new Date().toISOString()
         };
         await setDoc(txRef, txData);
@@ -616,7 +622,7 @@ export default function Dashboard() {
                   {selectedApproval.requesterId === user?.uid ? (
                     <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-center">
                       <p className="text-xs font-bold text-amber-900">Self-Review Restricted</p>
-                      <p className="text-[10px] text-amber-700">BR8.3.2: You cannot approve your own request. Another lead must review this.</p>
+                      <p className="text-[10px] text-amber-700">You cannot approve your own request. Another lead must review this.</p>
                     </div>
                   ) : (
                     <>

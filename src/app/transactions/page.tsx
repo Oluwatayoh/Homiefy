@@ -1,9 +1,8 @@
-
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
 import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
-import { doc, collection, query, orderBy, deleteDoc } from 'firebase/firestore';
+import { doc, collection, query, orderBy, deleteDoc, where } from 'firebase/firestore';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,12 +36,14 @@ export default function TransactionHistory() {
   const { data: userData } = useDoc(userDocRef);
 
   const txQuery = useMemoFirebase(() => {
-    if (!userData?.familyId) return null;
+    if (!userData?.familyId || !user) return null;
     return query(
       collection(db, 'families', userData.familyId, 'transactions'),
+      where(`members.${user.uid}`, '!=', null),
+      orderBy(`members.${user.uid}`),
       orderBy('date', sortOrder)
     );
-  }, [userData?.familyId, db, sortOrder]);
+  }, [userData?.familyId, user, db, sortOrder]);
 
   const { data: transactions, isLoading } = useCollection(txQuery);
 

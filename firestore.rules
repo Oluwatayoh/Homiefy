@@ -17,16 +17,6 @@ service cloud.firestore {
      * 2. Collaborative Family Data: Located at /families/{familyId} and its subcollections. 
      *    Access is governed by a denormalized 'members' map (UID to Role) present on every 
      *    document within this branch.
-     *
-     * KEY SECURITY DECISIONS:
-     * - No Public Access: All read and write operations require authentication.
-     * - Denormalization for Performance: Family membership data is copied onto all child 
-     *   records (budgets, goals, transactions). This allows for atomic security checks 
-     *   without hitting Firestore read limits for security overhead.
-     * - Relational Integrity: On creation, documents must correctly reference the 
-     *   authenticated user's identity to prevent data spoofing.
-     * - Resource-Specific Roles: Permissions within families (Admin, Parent, Child) 
-     *   are checked directly against the 'members' map on the document.
      */
 
     // --- GLOBAL HELPER FUNCTIONS ---
@@ -45,7 +35,6 @@ service cloud.firestore {
     }
 
     // Checks if the user is present in the denormalized 'members' map.
-    // Enhanced to handle null data gracefully for non-existent documents.
     function isFamilyMember(data) {
       return isSignedIn() && data != null && data.members != null && data.members[request.auth.uid] != null;
     }
@@ -76,7 +65,7 @@ service cloud.firestore {
     match /families/{familyId} {
       // Allow 'get' if document exists and user is member, or if it doesn't exist and they are signed in.
       allow get: if (resource == null && isSignedIn()) || isFamilyMember(resource.data);
-      allow list: if isSignedIn() && resource.data.members[request.auth.uid] != null;
+      allow list: if isSignedIn() && (resource == null || resource.data.members[request.auth.uid] != null);
       allow create: if isSignedIn() && request.resource.data.adminUserId == request.auth.uid;
       allow update: if resource != null && (isFamilyAdmin(resource.data) || isFamilyMember(resource.data));
       allow delete: if resource != null && isFamilyAdmin(resource.data);
@@ -86,10 +75,12 @@ service cloud.firestore {
        * Subcollections must include the 'members' map for security validation.
        */
       match /{subcollection}/{id} {
-        // Allow 'get' if signed in (handles checking for non-existent docs)
-        // Data access is only granted if the document contains the member mapping.
+        // Allow list only if correctly filtered by the authenticated user's membership.
+        allow list: if isSignedIn() && (resource == null || resource.data.members[request.auth.uid] != null);
+        
+        // Allow 'get' if document exists and user is member, or for creation checks.
         allow get: if (resource == null && isSignedIn()) || isFamilyMember(resource.data);
-        allow list: if isSignedIn() && resource.data.members[request.auth.uid] != null;
+        
         allow create: if isSignedIn() && isFamilyMember(request.resource.data);
         allow update: if resource != null && isFamilyMember(resource.data);
         allow delete: if resource != null && (isFamilyAdmin(resource.data) || isFamilyMember(resource.data));
