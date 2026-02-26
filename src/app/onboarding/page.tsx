@@ -21,7 +21,7 @@ export default function OnboardingPage() {
   
   const [loading, setLoading] = useState(false);
   const [familyName, setFamilyName] = useState('');
-  const [currency, setCurrency] = useState('USD');
+  const [currency, setCurrency] = useState('NGN');
   const [inviteCode, setInviteCode] = useState('');
   const [mode, setMode] = useState<'selection' | 'create' | 'join'>('selection');
 
@@ -50,7 +50,8 @@ export default function OnboardingPage() {
         name: familyName,
         inviteCode: code,
         inviteCodeExpires: expires.toISOString(),
-        currency: currency,
+        currencyCode: currency,
+        adminUserId: user.uid,
         members: {
           [user.uid]: 'Admin'
         },
@@ -58,8 +59,8 @@ export default function OnboardingPage() {
           'Member': 100,
           'Co-Manager': 500
         },
-        createdBy: user.uid,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       };
 
       await setDoc(familyRef, familyData);
@@ -93,11 +94,11 @@ export default function OnboardingPage() {
       const familyData = familyDoc.data();
       
       if (new Date(familyData.inviteCodeExpires) < new Date()) {
-        throw new Error("BR8.4.3: This invite code has expired.");
+        throw new Error("This invite code has expired.");
       }
 
       if (Object.keys(familyData.members || {}).length >= 10) {
-        throw new Error("BR8.4.5: Maximum family capacity reached.");
+        throw new Error("Maximum family capacity reached.");
       }
 
       await updateDoc(familyDoc.ref, {
@@ -164,7 +165,21 @@ export default function OnboardingPage() {
               <Label>Family Name</Label>
               <Input placeholder="The Smiths" value={familyName} onChange={(e) => setFamilyName(e.target.value)} />
             </div>
-            <div className="flex gap-3">
+            <div className="space-y-2">
+              <Label>Base Currency</Label>
+              <Select value={currency} onValueChange={setCurrency}>
+                <SelectTrigger className="rounded-xl h-11 bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NGN">Nigerian Naira (NGN)</SelectItem>
+                  <SelectItem value="USD">US Dollar (USD)</SelectItem>
+                  <SelectItem value="EUR">Euro (EUR)</SelectItem>
+                  <SelectItem value="GBP">British Pound (GBP)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-3 pt-2">
               <Button variant="outline" className="flex-1" onClick={() => setMode('selection')}>Back</Button>
               <Button className="flex-1" onClick={handleCreateFamily} disabled={!familyName}>Create</Button>
             </div>

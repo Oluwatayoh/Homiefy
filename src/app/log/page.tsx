@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from 'react';
@@ -17,6 +18,7 @@ import { Loader2, Plus, Smile, Meh, Frown, Sparkles, Brain, Camera, X, ShieldAle
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { cn } from '@/lib/utils';
 
 export default function RapidLog() {
   const { user, isUserLoading } = useUser();
@@ -52,7 +54,7 @@ export default function RapidLog() {
   }, [mounted]);
 
   const userDocRef = useMemoFirebase(() => {
-    return user ? doc(db, 'users', user.uid) : null;
+    return user ? doc(db, 'userProfiles', user.uid) : null;
   }, [user, db]);
 
   const { data: userData } = useDoc(userDocRef);
@@ -82,12 +84,10 @@ export default function RapidLog() {
     return !isNaN(val) && val > threshold;
   }, [amount, threshold]);
 
-  // BR8.2.2: Transaction date cannot be future
   const isFutureDate = useMemo(() => {
     return new Date(date) > new Date();
   }, [date]);
 
-  // BR8.2.1: Transaction amount must be > 0
   const isAmountValid = useMemo(() => {
     const val = parseFloat(amount);
     return !isNaN(val) && val > 0;
@@ -281,7 +281,7 @@ export default function RapidLog() {
             value={date}
             onChange={(e) => setDate(e.target.value)}
           />
-          {isFutureDate && <p className="text-[9px] text-red-500 font-bold">BR8.2.2: DATE CANNOT BE IN THE FUTURE</p>}
+          {isFutureDate && <p className="text-[9px] text-red-500 font-bold">DATE CANNOT BE IN THE FUTURE</p>}
         </div>
 
         <div className="space-y-2">

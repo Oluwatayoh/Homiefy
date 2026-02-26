@@ -1,8 +1,8 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
 import { purchaseImpactAnalysis, type PurchaseImpactAnalysisOutput } from '@/ai/flows/purchase-impact-analysis-flow';
-import { alternativePurchaseRecommendations, type AlternativePurchaseRecommendationsOutput } from '@/ai/flows/alternative-purchase-recommendations';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, collection, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Input } from '@/components/ui/input';
@@ -14,11 +14,13 @@ import { Loader2, Zap, AlertTriangle, ArrowRightCircle, Target, Sparkles, Brain,
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 
 export default function PreSpendTool() {
   const { user, isUserLoading } = useUser();
   const db = useFirestore();
   const { toast } = useToast();
+  const router = useRouter();
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -34,7 +36,7 @@ export default function PreSpendTool() {
   const [decisionId, setDecisionId] = useState<string | null>(null);
 
   const userDocRef = useMemoFirebase(() => {
-    return user ? doc(db, 'users', user.uid) : null;
+    return user ? doc(db, 'userProfiles', user.uid) : null;
   }, [user, db]);
 
   const { data: userData } = useDoc(userDocRef);
@@ -50,7 +52,6 @@ export default function PreSpendTool() {
 
   const { data: budgetData } = useDoc(budgetDocRef);
 
-  // Mocking goals for analysis context until Goal module is fully implemented
   const mockGoals = [
     { name: "Emergency Fund", targetAmount: 10000, currentAmount: 5000, deadline: "2025-12-01" },
     { name: "Family Vacation", targetAmount: 3000, currentAmount: 800, deadline: "2025-06-01" }
@@ -68,9 +69,8 @@ export default function PreSpendTool() {
   }, [budgetData]);
 
   async function handleAnalyze() {
-    // BR8.5.1: Decision check requires active budget
     if (!budgetData) {
-      toast({ variant: "destructive", title: "Active Budget Required", description: "BR8.5.1: You must have an active budget for the current month to use the Decision Intel engine." });
+      toast({ variant: "destructive", title: "Active Budget Required", description: "You must have an active budget for the current month to use the Decision Intel engine." });
       return;
     }
 
@@ -88,14 +88,13 @@ export default function PreSpendTool() {
         currentBudget: budgetData?.totalIncome || 0,
         envelopeBalance: selectedEnvelope ? (selectedEnvelope.allocated - selectedEnvelope.spent) : 0,
         envelopeTotal: selectedEnvelope?.allocated || 0,
-        currentSavings: 15000, // Fixed mock until savings module
+        currentSavings: 15000,
         safeToSpendDaily: stsData.amount,
         familyGoals: mockGoals,
       });
 
       setResult(analysis);
 
-      // Log decision (FR5.4)
       const decisionRef = doc(collection(db, 'families', userData.familyId, 'decisions'));
       const decisionData = {
         id: decisionRef.id,
@@ -154,7 +153,7 @@ export default function PreSpendTool() {
         <div className="p-6 rounded-2xl bg-amber-50 border border-amber-200 text-center space-y-4">
           <AlertCircle className="w-12 h-12 text-amber-600 mx-auto" />
           <h2 className="font-bold">Active Budget Required</h2>
-          <p className="text-sm text-amber-700">According to Business Rule 8.5.1, we need your current monthly budget to analyze spending impact.</p>
+          <p className="text-sm text-amber-700">We need your current monthly budget to analyze spending impact.</p>
           <Button onClick={() => router.push('/budget')}>Create Budget</Button>
         </div>
       )}

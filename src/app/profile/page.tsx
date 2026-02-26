@@ -291,6 +291,7 @@ export default function ProfilePage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="USD">US Dollar (USD)</SelectItem>
+                      <SelectItem value="NGN">Nigerian Naira (NGN)</SelectItem>
                       <SelectItem value="EUR">Euro (EUR)</SelectItem>
                       <SelectItem value="GBP">British Pound (GBP)</SelectItem>
                     </SelectContent>

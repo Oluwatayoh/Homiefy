@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Loader2, Search, Filter, ArrowUpDown, Trash2, Edit3, Eye, Calendar, User, Tag, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import Image from 'next/image';
+import Image from 'image';
 import { cn } from '@/lib/utils';
 
 export default function TransactionHistory() {
@@ -27,7 +27,7 @@ export default function TransactionHistory() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const userDocRef = useMemoFirebase(() => {
-    return user ? doc(db, 'users', user.uid) : null;
+    return user ? doc(db, 'userProfiles', user.uid) : null;
   }, [user, db]);
 
   const { data: userData } = useDoc(userDocRef);
@@ -85,7 +85,6 @@ export default function TransactionHistory() {
         </Button>
       </header>
 
-      {/* Filters (FR4.3.3) */}
       <div className="space-y-3">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -118,7 +117,6 @@ export default function TransactionHistory() {
         </div>
       </div>
 
-      {/* List (FR4.3) */}
       <div className="space-y-3">
         {filteredTransactions.map((tx) => (
           <Card 
@@ -154,7 +152,6 @@ export default function TransactionHistory() {
         )}
       </div>
 
-      {/* Detail Modal (FR4.4) */}
       <Dialog open={!!selectedTx} onOpenChange={(open) => !open && setSelectedTx(null)}>
         <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
@@ -191,7 +188,7 @@ export default function TransactionHistory() {
                 <div className="space-y-2">
                   <p className="text-[10px] font-bold uppercase text-muted-foreground">Receipt Photo</p>
                   <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden shadow-md">
-                    <Image src={selectedTx.receiptPhoto} alt="Receipt" fill className="object-cover" />
+                    <img src={selectedTx.receiptPhoto} alt="Receipt" className="object-cover w-full h-full" />
                   </div>
                 </div>
               )}
