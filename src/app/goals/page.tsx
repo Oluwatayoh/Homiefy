@@ -132,7 +132,7 @@ export default function GoalsPage() {
           goals.map((goal) => {
             const percent = Math.round((goal.currentAmount / goal.targetAmount) * 100);
             return (
-              <Card key={goal.id} className="border-none shadow-xl bg-white overflow-hidden">
+              <Card key={goal.id} className="border-none shadow-xl overflow-hidden">
                 <CardContent className="p-0">
                   <div className="p-6 pb-0">
                     <div className="flex justify-between items-start mb-4">

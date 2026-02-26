@@ -306,7 +306,7 @@ export default function Dashboard() {
       {isBudgetLoading || isGoalsLoading ? (
         <Skeleton className="h-[96px] w-full rounded-xl" />
       ) : (
-        <Card className="border-none shadow-sm bg-white overflow-hidden cursor-pointer hover:bg-secondary/5 transition-colors" onClick={() => setShowScoreBreakdown(true)}>
+        <Card className="border-none shadow-sm overflow-hidden cursor-pointer hover:bg-secondary/5 transition-colors" onClick={() => setShowScoreBreakdown(true)}>
           <CardContent className="p-4 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="relative w-16 h-16 flex items-center justify-center">
@@ -351,7 +351,7 @@ export default function Dashboard() {
               <PieChart className="h-4 w-4 text-primary" /> Spending Mix
             </h3>
           </div>
-          <Card className="border-none bg-white shadow-sm p-4 h-[240px] flex items-center justify-center">
+          <Card className="border-none shadow-sm p-4 h-[240px] flex items-center justify-center">
              <ChartContainer 
               config={Object.fromEntries(stsData.pieData.map(d => [d.name, { label: d.name, color: d.fill }]))}
               className="w-full h-full"
@@ -398,12 +398,12 @@ export default function Dashboard() {
             {filteredApprovals.map((req) => (
               <Card 
                 key={req.id} 
-                className="border-none bg-amber-50 shadow-sm border-l-4 border-amber-500 cursor-pointer hover:bg-amber-100 transition-colors"
+                className="border-none bg-amber-50 dark:bg-amber-950/20 shadow-sm border-l-4 border-amber-500 cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
                 onClick={() => setSelectedApproval(req)}
               >
                 <CardContent className="p-3 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-600 flex items-center justify-center">
                       <ShieldCheck className="h-4 w-4" />
                     </div>
                     <div>
@@ -411,7 +411,7 @@ export default function Dashboard() {
                       <p className="text-[10px] text-muted-foreground">{req.requesterName} • {currencySymbol}{req.transactionData?.amount?.toFixed(2)}</p>
                     </div>
                   </div>
-                  <Badge variant="outline" className="text-[8px] border-amber-300 text-amber-700">REVIEW</Badge>
+                  <Badge variant="outline" className="text-[8px] border-amber-300 text-amber-700 dark:text-amber-400">REVIEW</Badge>
                 </CardContent>
               </Card>
             ))}
@@ -439,7 +439,7 @@ export default function Dashboard() {
               {goalsData.map((goal) => {
                 const percent = Math.min(100, (goal.currentAmount / (goal.targetAmount || 1)) * 100);
                 return (
-                  <Card key={goal.id} className="border-none bg-white shadow-sm p-4 space-y-2">
+                  <Card key={goal.id} className="border-none shadow-sm p-4 space-y-2">
                     <div className="flex justify-between items-center">
                       <span className="text-xs font-bold">{goal.name}</span>
                       <span className="text-[10px] font-bold text-primary">{Math.round(percent)}%</span>
@@ -477,7 +477,7 @@ export default function Dashboard() {
         ) : recentTxs && recentTxs.length > 0 ? (
           <div className="space-y-2">
             {recentTxs.map((tx) => (
-              <Card key={tx.id} className="border-none bg-white shadow-sm overflow-hidden" onClick={() => router.push(`/transactions`)}>
+              <Card key={tx.id} className="border-none shadow-sm overflow-hidden" onClick={() => router.push(`/transactions`)}>
                 <CardContent className="p-3 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center text-primary">
@@ -511,9 +511,9 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 gap-4 mt-2">
         <button 
           onClick={() => router.push('/log')}
-          className="p-4 rounded-2xl bg-white shadow-sm border border-transparent hover:border-primary transition-all text-left group"
+          className="p-4 rounded-2xl bg-card shadow-sm border border-transparent hover:border-primary transition-all text-left group"
         >
-          <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center mb-3 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+          <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 flex items-center justify-center mb-3 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
             <Plus className="h-6 w-6" />
           </div>
           <p className="font-bold text-sm">Rapid Log</p>
@@ -521,9 +521,9 @@ export default function Dashboard() {
         </button>
         <button 
           onClick={() => router.push('/pre-spend')}
-          className="p-4 rounded-2xl bg-white shadow-sm border border-transparent hover:border-accent transition-all text-left group"
+          className="p-4 rounded-2xl bg-card shadow-sm border border-transparent hover:border-accent transition-all text-left group"
         >
-          <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center mb-3 group-hover:bg-amber-600 group-hover:text-white transition-colors">
+          <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-600 flex items-center justify-center mb-3 group-hover:bg-amber-600 group-hover:text-white transition-colors">
             <Sparkles className="h-6 w-6" />
           </div>
           <p className="font-bold text-sm">Pre-Spend</p>
@@ -611,9 +611,9 @@ export default function Dashboard() {
               {isStaff ? (
                 <div className="flex flex-col gap-2 pt-4">
                   {selectedApproval.requesterId === user?.uid ? (
-                    <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-center">
-                      <p className="text-xs font-bold text-amber-900">Self-Review Restricted</p>
-                      <p className="text-[10px] text-amber-700">You cannot approve your own request. Another lead must review this.</p>
+                    <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 text-center">
+                      <p className="text-xs font-bold text-amber-900 dark:text-amber-400">Self-Review Restricted</p>
+                      <p className="text-[10px] text-amber-700 dark:text-amber-500">You cannot approve your own request. Another lead must review this.</p>
                     </div>
                   ) : (
                     <>
@@ -637,9 +637,9 @@ export default function Dashboard() {
                   )}
                 </div>
               ) : (
-                <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-center">
-                  <p className="text-xs font-bold text-amber-900">Awaiting Decision</p>
-                  <p className="text-[10px] text-amber-700">An Admin or Co-Manager needs to review this.</p>
+                <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 text-center">
+                  <p className="text-xs font-bold text-amber-900 dark:text-amber-400">Awaiting Decision</p>
+                  <p className="text-[10px] text-amber-700 dark:text-amber-500">An Admin or Co-Manager needs to review this.</p>
                 </div>
               )}
             </div>

@@ -184,7 +184,7 @@ export default function ProfilePage() {
         <p className="text-muted-foreground text-sm">Manage your account and preferences.</p>
       </header>
 
-      <Card className="border-none shadow-xl bg-white overflow-hidden">
+      <Card className="border-none shadow-xl overflow-hidden">
         <CardContent className="p-6">
           <div className="flex items-center gap-4 mb-6">
             <Avatar className="h-16 w-16 border-2 border-primary/20">
@@ -232,7 +232,7 @@ export default function ProfilePage() {
                       value={editEmail} 
                       onChange={(e) => setEditEmail(e.target.value)} 
                       disabled={isEmailDisabled}
-                      className="rounded-xl pl-10 bg-white/50 disabled:opacity-50" 
+                      className="rounded-xl pl-10 bg-background/50 disabled:opacity-50" 
                     />
                   </div>
                 </div>
@@ -247,7 +247,7 @@ export default function ProfilePage() {
                       value={editPhone} 
                       onChange={(e) => setEditPhone(e.target.value)} 
                       disabled={isPhoneDisabled}
-                      className="rounded-xl pl-10 bg-white/50 disabled:opacity-50" 
+                      className="rounded-xl pl-10 bg-background/50 disabled:opacity-50" 
                     />
                   </div>
                 </div>
@@ -275,9 +275,9 @@ export default function ProfilePage() {
               <AccordionContent className="p-4 bg-secondary/10 rounded-b-xl space-y-4">
                 <div className="space-y-2">
                   {isBiometricsEnabled ? (
-                    <div className="flex items-center justify-between p-3 bg-white rounded-xl border border-primary/20">
+                    <div className="flex items-center justify-between p-3 bg-card rounded-xl border border-primary/20">
                       <div className="flex items-center gap-2">
-                        <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 border-none">ACTIVE</Badge>
+                        <Badge variant="secondary" className="bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 border-none">ACTIVE</Badge>
                         <span className="text-xs font-medium">Device Registered</span>
                       </div>
                       <Button variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={handleRemoveBiometrics}>
@@ -325,7 +325,7 @@ export default function ProfilePage() {
                 <div className="space-y-3">
                   <Label className="text-[10px] font-bold uppercase text-muted-foreground">Base Currency</Label>
                   <Select value={currency} onValueChange={setCurrency}>
-                    <SelectTrigger className="rounded-xl h-11 bg-white">
+                    <SelectTrigger className="rounded-xl h-11 bg-background">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

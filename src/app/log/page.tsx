@@ -237,7 +237,7 @@ export default function RapidLog() {
         <p className="text-muted-foreground text-sm">Lightning fast record keeping.</p>
       </header>
 
-      <Card className="border-none shadow-xl bg-white p-6 space-y-6">
+      <Card className="border-none shadow-xl p-6 space-y-6">
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
             <label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Amount</label>
@@ -333,11 +333,11 @@ export default function RapidLog() {
         </div>
 
         {isOverThreshold && (
-          <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3">
+          <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 flex items-start gap-3">
             <ShieldAlert className="h-5 w-5 text-amber-600 shrink-0" />
             <div>
-              <p className="text-xs font-bold text-amber-900">Approval Required</p>
-              <p className="text-[10px] text-amber-700">This amount exceeds your family spending threshold ({currencySymbol}{threshold}).</p>
+              <p className="text-xs font-bold text-amber-900 dark:text-amber-400">Approval Required</p>
+              <p className="text-[10px] text-amber-700 dark:text-amber-500">This amount exceeds your family spending threshold ({currencySymbol}{threshold}).</p>
             </div>
           </div>
         )}

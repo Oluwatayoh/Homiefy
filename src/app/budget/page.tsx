@@ -189,7 +189,7 @@ export default function BudgetManagement() {
           <h1 className="text-2xl font-bold font-headline">Budget Explorer</h1>
           <p className="text-muted-foreground text-sm">Managing family resources.</p>
         </div>
-        <div className="flex items-center gap-1 bg-white border rounded-xl p-1 shadow-sm">
+        <div className="flex items-center gap-1 bg-card border rounded-xl p-1 shadow-sm">
           <Button variant="ghost" size="icon" onClick={() => navigateMonth(-1)} className="h-8 w-8 rounded-lg">
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -210,7 +210,7 @@ export default function BudgetManagement() {
       </header>
 
       {isFutureMonth ? (
-        <div className="p-8 text-center bg-white rounded-2xl border shadow-sm space-y-4">
+        <div className="p-8 text-center bg-card rounded-2xl border shadow-sm space-y-4">
           <Calendar className="w-12 h-12 text-muted-foreground mx-auto" />
           <h2 className="font-bold">Future Budget Restricted</h2>
           <p className="text-sm text-muted-foreground">You cannot create or view budgets for future periods according to governance rules.</p>
@@ -260,14 +260,14 @@ export default function BudgetManagement() {
           </Card>
 
           {isCurrentMonth && remainingIncome < 0 && (
-            <div className="p-3 rounded-lg bg-red-100 border border-red-200 flex items-center gap-2 text-red-600 text-xs font-bold animate-pulse">
+            <div className="p-3 rounded-lg bg-red-100 dark:bg-red-950/30 border border-red-200 dark:border-red-900 flex items-center gap-2 text-red-600 dark:text-red-400 text-xs font-bold animate-pulse">
               <AlertTriangle className="h-4 w-4" />
               ALLOCATIONS EXCEED INCOME!
             </div>
           )}
 
           {isCurrentMonth && remainingIncome > 0 && parseFloat(income) > 0 && (
-            <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 flex items-center gap-2 text-amber-700 text-xs font-bold">
+            <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 flex items-center gap-2 text-amber-700 dark:text-amber-400 text-xs font-bold">
               <Info className="h-4 w-4" />
               UNALLOCATED FUNDS: {currencySymbol}{remainingIncome.toFixed(2)}
             </div>
@@ -286,13 +286,13 @@ export default function BudgetManagement() {
                 const isOver = percent >= 100;
                 
                 return (
-                  <Card key={env.id} className="border-none shadow-sm overflow-hidden bg-white group">
+                  <Card key={env.id} className="border-none shadow-sm overflow-hidden group">
                     <CardContent className="p-4 space-y-3">
                       <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3 flex-1">
                           <div className={cn(
                             "w-10 h-10 rounded-xl flex items-center justify-center transition-colors",
-                            isOver ? "bg-red-100 text-red-600" : isWarning ? "bg-amber-100 text-amber-600" : "bg-secondary text-primary"
+                            isOver ? "bg-red-100 dark:bg-red-900/40 text-red-600" : isWarning ? "bg-amber-100 dark:bg-amber-900/40 text-amber-600" : "bg-secondary text-primary"
                           )}>
                             <PieChart className="h-5 w-5" />
                           </div>
