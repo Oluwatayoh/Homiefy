@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -43,7 +42,7 @@ export default function ProfilePage() {
   
   const [pushEnabled, setPushEnabled] = useState(true);
   const [alertThreshold, setAlertThreshold] = useState([80]);
-  const [currency, setCurrency] = useState('USD');
+  const [currency, setCurrency] = useState('NGN');
   const [isBiometricsEnabled, setIsBiometricsEnabled] = useState(false);
   
   const [showBioPrompt, setShowBioPrompt] = useState(false);
@@ -64,7 +63,7 @@ export default function ProfilePage() {
       setEditPhoto(userData.photoUrl || null);
       setPushEnabled(userData.preferences?.pushNotifications ?? true);
       setAlertThreshold([userData.preferences?.alertThreshold ?? 80]);
-      setCurrency(userData.preferences?.currency || 'USD');
+      setCurrency(userData.preferences?.currency || 'NGN');
       
       const localBio = localStorage.getItem('biometric_enabled') === 'true';
       setIsBiometricsEnabled(localBio);
@@ -164,7 +163,6 @@ export default function ProfilePage() {
 
   if (!user) return null;
 
-  // Logic: Disable if field exists in the database
   const isEmailDisabled = !!userData?.email;
   const isPhoneDisabled = !!userData?.phoneNumber;
 
@@ -195,12 +193,11 @@ export default function ProfilePage() {
 
           <Accordion type="single" collapsible className="w-full space-y-4">
             <AccordionItem value="personal-info" className="border-none">
-              <AccordionTrigger className="p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors hover:no-underline [&>svg:last-child]:hidden">
+              <AccordionTrigger className="p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors hover:no-underline">
                 <div className="flex items-center gap-3">
                   <UserIcon className="h-5 w-5 text-primary" />
                   <span className="font-medium">Personal Information</span>
                 </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground ml-auto" />
               </AccordionTrigger>
               <AccordionContent className="p-4 bg-secondary/10 rounded-b-xl space-y-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -258,12 +255,11 @@ export default function ProfilePage() {
             </AccordionItem>
 
             <AccordionItem value="biometrics" className="border-none">
-              <AccordionTrigger className="p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors hover:no-underline [&>svg:last-child]:hidden">
+              <AccordionTrigger className="p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors hover:no-underline">
                 <div className="flex items-center gap-3">
                   <Fingerprint className="h-5 w-5 text-primary" />
                   <span className="font-medium">Biometric Security</span>
                 </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground ml-auto" />
               </AccordionTrigger>
               <AccordionContent className="p-4 bg-secondary/10 rounded-b-xl space-y-4">
                 <div className="space-y-2">
@@ -290,12 +286,11 @@ export default function ProfilePage() {
             </AccordionItem>
 
             <AccordionItem value="notifications" className="border-none">
-              <AccordionTrigger className="p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors hover:no-underline [&>svg:last-child]:hidden">
+              <AccordionTrigger className="p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors hover:no-underline">
                 <div className="flex items-center gap-3">
                   <Bell className="h-5 w-5 text-primary" />
                   <span className="font-medium">Notifications</span>
                 </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground ml-auto" />
               </AccordionTrigger>
               <AccordionContent className="p-4 bg-secondary/10 rounded-b-xl space-y-4">
                 <div className="flex items-center justify-between">
@@ -309,12 +304,11 @@ export default function ProfilePage() {
             </AccordionItem>
 
             <AccordionItem value="preferences" className="border-none">
-              <AccordionTrigger className="p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors hover:no-underline [&>svg:last-child]:hidden">
+              <AccordionTrigger className="p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors hover:no-underline">
                 <div className="flex items-center gap-3">
                   <Settings className="h-5 w-5 text-primary" />
                   <span className="font-medium">Preferences</span>
                 </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground ml-auto transition-transform duration-200" />
               </AccordionTrigger>
               <AccordionContent className="p-4 bg-secondary/10 rounded-b-xl space-y-4">
                 <div className="space-y-3">
@@ -324,8 +318,8 @@ export default function ProfilePage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="USD">US Dollar (USD)</SelectItem>
                       <SelectItem value="NGN">Nigerian Naira (NGN)</SelectItem>
+                      <SelectItem value="USD">US Dollar (USD)</SelectItem>
                       <SelectItem value="EUR">Euro (EUR)</SelectItem>
                       <SelectItem value="GBP">British Pound (GBP)</SelectItem>
                     </SelectContent>

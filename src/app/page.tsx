@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Zap, ShieldCheck, Mail, Lock, Phone, Loader2, Fingerprint, Eye, EyeOff } from 'lucide-react';
+import { Zap, ShieldCheck, Mail, Lock, Phone, Loader2, Fingerprint, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -107,7 +107,7 @@ export default function LandingPage() {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           preferences: {
-            currency: 'USD',
+            currency: 'NGN',
             alertThreshold: 80,
             pushNotifications: true
           }
@@ -152,7 +152,7 @@ export default function LandingPage() {
         role: 'Member',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        preferences: { currency: 'USD', alertThreshold: 80, pushNotifications: true }
+        preferences: { currency: 'NGN', alertThreshold: 80, pushNotifications: true }
       });
       
       saveBiometricCreds(email, password);
@@ -184,7 +184,7 @@ export default function LandingPage() {
           role: 'Member',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-          preferences: { currency: 'USD', alertThreshold: 80, pushNotifications: true }
+          preferences: { currency: 'NGN', alertThreshold: 80, pushNotifications: true }
         });
       }
 
@@ -239,6 +239,7 @@ export default function LandingPage() {
     if (error instanceof FirebaseError) {
       if (error.code === 'auth/email-already-in-use') message = 'This email is already registered.';
       else if (error.code === 'auth/invalid-credential') message = 'Invalid email or password.';
+      else if (error.code === 'auth/popup-blocked') message = 'Popup blocked! Please allow popups for this site in your browser settings to sign in with Google.';
       else message = error.message;
     }
     toast({ variant: 'destructive', title: 'Authentication Error', description: message });
