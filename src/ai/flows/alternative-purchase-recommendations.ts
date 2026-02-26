@@ -61,7 +61,7 @@ Given a potential purchase and its analyzed impact on the family's financial goa
 These alternatives should aim to either save money, reallocate funds towards higher-priority goals, or promote better financial discipline, directly addressing the impact identified.
 
 Potential Purchase: {{{purchaseDescription}}}
-Cost: ${{purchaseCost}}
+Cost: \${{purchaseCost}}
 Impact Analysis: {{{impactAnalysis}}}
 
 Family's Current Financial Goals:
