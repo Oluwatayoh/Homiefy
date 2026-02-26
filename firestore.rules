@@ -3,12 +3,12 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * Homiefy SECURITY RULES - ROBUST PROTOTYPING MODE
-     *
+     * Homiefy SECURITY RULES
+     * 
      * CORE PHILOSOPHY:
-     * This ruleset balances security with rapid iteration. It uses parent-document 
-     * validation for subcollections to simplify queries and avoid complex composite index 
-     * requirements while maintaining strict data isolation between families.
+     * 1. Path-based isolation for User Profiles.
+     * 2. Membership-based isolation for Family data.
+     * 3. Rules are kept simple to avoid hidden index requirements or 'Missing Permissions' crashes.
      */
 
     // --- GLOBAL HELPER FUNCTIONS ---
@@ -21,17 +21,7 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Checks if a user is a member of a specific family document.
-    function isFamilyMember(data) {
-      return isSignedIn() && data != null && data.members != null && data.members[request.auth.uid] != null;
-    }
-
-    // Checks if the user has the 'Admin' role in the family data.
-    function isFamilyAdmin(data) {
-      return isSignedIn() && data != null && data.members != null && data.members[request.auth.uid] == 'Admin';
-    }
-
-    // Checks membership by looking up the parent family document.
+    // Checks if the user is a member of a family document by looking up the document's members map.
     function isMemberOfFamily(familyId) {
       return isSignedIn() && 
              get(/databases/$(database)/documents/families/$(familyId)).data.members[request.auth.uid] != null;
@@ -43,35 +33,34 @@ service cloud.firestore {
      * @description Rules for individual user profiles.
      */
     match /userProfiles/{userId} {
-      allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId);
+      allow get, list: if isOwner(userId);
+      allow create, update: if isOwner(userId);
       allow delete: if isOwner(userId);
     }
 
     /**
-     * @description Rules for family units.
+     * @description Rules for family units and their shared data.
      */
     match /families/{familyId} {
-      // Allow 'get' if document exists and user is member, or if they are signed in (for joining).
-      allow get: if isSignedIn();
-      // Allow 'list' for searching (e.g., invite codes) and for members.
-      allow list: if isSignedIn();
+      // Allow any signed-in user to 'get' or 'list' families (necessary for joining via code).
+      allow get, list: if isSignedIn();
       
+      // Only the creator can create the family.
       allow create: if isSignedIn() && request.resource.data.adminUserId == request.auth.uid;
-      allow update: if isFamilyMember(resource.data) || isFamilyAdmin(resource.data);
-      allow delete: if isFamilyAdmin(resource.data);
+      
+      // Updates and deletes are restricted to members or admins.
+      allow update: if isMemberOfFamily(familyId);
+      allow delete: if isSignedIn() && get(/databases/$(database)/documents/families/$(familyId)).data.members[request.auth.uid] == 'Admin';
 
       /**
-       * @description Shared subcollections (Budgets, Goals, Transactions, Approvals, Decisions).
-       * Access is granted if the user is a member of the parent family document.
+       * @description Recursive match for all family subcollections (Budgets, Goals, Transactions, Approvals, Decisions).
+       * Access is granted if the user is a member of the family.
        */
-      match /{subcollection}/{id} {
+      match /{allSubcollections=**} {
+        // For list operations, the query must also include a filter that matches this logic if it's data-bound.
+        // However, since we're using path-based parent checks, simple subcollection queries are allowed for members.
         allow get, list: if isMemberOfFamily(familyId);
-        allow create: if isMemberOfFamily(familyId);
-        allow update: if isMemberOfFamily(familyId);
-        allow delete: if isMemberOfFamily(familyId);
+        allow create, update, delete: if isMemberOfFamily(familyId);
       }
     }
   }

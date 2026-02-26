@@ -60,52 +60,57 @@ export default function Dashboard() {
   const { data: budgetData, isLoading: isBudgetLoading } = useDoc(budgetDocRef);
 
   const txQuery = useMemoFirebase(() => {
-    if (!userData?.familyId) return null;
+    if (!userData?.familyId || !user?.uid) return null;
     return query(
       collection(db, 'families', userData.familyId, 'transactions'),
       orderBy('date', 'desc'),
       limit(5)
     );
-  }, [userData?.familyId, db]);
+  }, [userData?.familyId, user?.uid, db]);
 
   const { data: recentTxs, isLoading: isTxsLoading } = useCollection(txQuery);
 
   const goalsQuery = useMemoFirebase(() => {
-    if (!userData?.familyId) return null;
+    if (!userData?.familyId || !user?.uid) return null;
     return query(
       collection(db, 'families', userData.familyId, 'goals'),
       orderBy('createdAt', 'desc'),
       limit(3)
     );
-  }, [userData?.familyId, db]);
+  }, [userData?.familyId, user?.uid, db]);
 
   const { data: goalsData, isLoading: isGoalsLoading } = useCollection(goalsQuery);
 
   const decisionsQuery = useMemoFirebase(() => {
-    if (!userData?.familyId) return null;
+    if (!userData?.familyId || !user?.uid) return null;
     return query(
       collection(db, 'families', userData.familyId, 'decisions'),
       orderBy('timestamp', 'desc'),
       limit(10)
     );
-  }, [userData?.familyId, db]);
+  }, [userData?.familyId, user?.uid, db]);
 
   const { data: recentDecisions } = useCollection(decisionsQuery);
 
   const isStaff = userData?.role === 'Admin' || userData?.role === 'Co-Manager';
 
   const approvalsQuery = useMemoFirebase(() => {
-    if (!userData?.familyId) return null;
+    if (!userData?.familyId || !user?.uid) return null;
+    
+    const baseCol = collection(db, 'families', userData.familyId, 'approvals');
+    
     if (isStaff) {
+      // Leads see all pending requests for the family
       return query(
-        collection(db, 'families', userData.familyId, 'approvals'),
+        baseCol,
         where('status', '==', 'Pending'),
         orderBy('requestedAt', 'desc')
       );
     } else {
+      // Members only see their own pending requests
       return query(
-        collection(db, 'families', userData.familyId, 'approvals'),
-        where('requesterId', '==', user?.uid),
+        baseCol,
+        where('requesterId', '==', user.uid),
         where('status', '==', 'Pending'),
         orderBy('requestedAt', 'desc')
       );
