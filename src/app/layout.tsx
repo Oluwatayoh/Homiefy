@@ -5,7 +5,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { FirebaseClientProvider } from '@/firebase';
 
 export const metadata: Metadata = {
-  title: 'KINETY | Family Financial Behavior OS',
+  title: 'Homiefy | Family Financial Behavior OS',
   description: 'Collaborative decision-intelligence for family spending.',
 };
 

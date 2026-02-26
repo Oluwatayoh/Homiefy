@@ -116,7 +116,7 @@ export default function ProfilePage() {
       
       const publicKeyCredentialCreationOptions: PublicKeyCredentialCreationOptions = {
         challenge,
-        rp: { name: "KINETY", id: window.location.hostname },
+        rp: { name: "Homiefy", id: window.location.hostname },
         user: {
           id: Uint8Array.from(user.uid, c => c.charCodeAt(0)),
           name: user.email || user.uid,
@@ -247,7 +247,7 @@ export default function ProfilePage() {
                     </Button>
                   )}
                   <p className="text-[10px] text-muted-foreground">
-                    <Info className="inline h-3 w-3 mr-1" /> Enables Fingerprint/FaceID sign-in on this device.
+                    <span className="inline-flex items-center mr-1"><Info className="h-3 w-3" /></span> Enables Fingerprint/FaceID sign-in on this device.
                   </p>
                 </div>
               </AccordionContent>

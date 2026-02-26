@@ -103,7 +103,6 @@ export default function LandingPage() {
           lastName: names.slice(1).join(' ') || '',
           email: user.email,
           displayName: user.displayName,
-          photoUrl: user.photoURL,
           role: 'Member',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -115,7 +114,6 @@ export default function LandingPage() {
         });
       }
       toast({ title: "Welcome!", description: "Signed in with Google." });
-      // Navigation handled by the top-level useEffect
     } catch (error: any) {
       setLoading(false);
       handleAuthError(error);
@@ -171,7 +169,25 @@ export default function LandingPage() {
 
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      
+      // Verify profile exists
+      const userRef = doc(db, 'userProfiles', result.user.uid);
+      const userSnap = await getDoc(userRef);
+      if (!userSnap.exists()) {
+        await setDoc(userRef, {
+          id: result.user.uid,
+          firstName: 'User',
+          lastName: '',
+          email: result.user.email,
+          displayName: result.user.email,
+          role: 'Member',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          preferences: { currency: 'USD', alertThreshold: 80, pushNotifications: true }
+        });
+      }
+
       saveBiometricCreds(email, password);
       toast({ title: "Welcome Back", description: "Signed in successfully." });
     } catch (error: any) {
@@ -205,13 +221,11 @@ export default function LandingPage() {
         const decodedPass = atob(storedCred);
         await signInWithEmailAndPassword(auth, storedEmail, decodedPass);
         toast({ title: "Success", description: "Biometric sign-in complete." });
-        // Redirection handled by useEffect
       } else {
         setLoading(false);
       }
     } catch (error: any) {
       setLoading(false);
-      console.error("Biometric login failed:", error);
       let message = 'Could not verify identity. Please use your password.';
       if (error.name === 'NotAllowedError') {
         message = 'Biometric sign-in is restricted by browser security policies.';
@@ -240,7 +254,7 @@ export default function LandingPage() {
         <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mb-4 shadow-lg">
           <Zap className="text-white w-10 h-10" />
         </div>
-        <h1 className="text-4xl font-bold text-primary tracking-tight font-headline">KINETY</h1>
+        <h1 className="text-4xl font-bold text-primary tracking-tight font-headline">Homiefy</h1>
         <p className="text-muted-foreground text-sm font-medium mt-1">Family Financial Behavior OS</p>
       </div>
 

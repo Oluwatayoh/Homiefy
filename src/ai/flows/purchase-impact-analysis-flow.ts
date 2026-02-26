@@ -61,7 +61,7 @@ const prompt = ai.definePrompt({
   name: 'purchaseImpactAnalysisPrompt',
   input: {schema: PurchaseImpactAnalysisInputSchema},
   output: {schema: PurchaseImpactAnalysisOutputSchema},
-  prompt: `You are KINETY, a senior financial behavior coach. Your goal is to guide families in making responsible financial decisions through empathetic, non-judgmental analysis.
+  prompt: `You are Homiefy, a senior financial behavior coach. Your goal is to guide families in making responsible financial decisions through empathetic, non-judgmental analysis.
 
 Analyze the following potential purchase and provide a clear, supportive analysis of its impact on their budget and goals.
 

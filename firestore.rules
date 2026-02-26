@@ -3,7 +3,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * KINETY SECURITY RULES - PROTOTYPING MODE
+     * Homiefy SECURITY RULES - PROTOTYPING MODE
      *
      * CORE PHILOSOPHY:
      * This ruleset implements a strict, high-security authorization model while remaining flexible 
@@ -27,19 +27,6 @@ service cloud.firestore {
      *   authenticated user's identity to prevent data spoofing.
      * - Resource-Specific Roles: Permissions within families (Admin, Parent, Child) 
      *   are checked directly against the 'members' map on the document.
-     */
-
-    /**
-     * STEP 1: ANALYSIS & SYNTHESIS
-     * 1. Adopt Intent: Following the reasoning, we prioritize Authorization Independence 
-     *    by relying on denormalized membership maps.
-     * 2. Access Patterns:
-     *    - /userProfiles/{userId}: Ownership Pattern (P3.1 & P3.4).
-     *    - /families/{familyId}: Shared Access / Closed Collaborators (P3.3).
-     *    - /families/{familyId}/...: Shared Access via Denormalization (P3.3).
-     * 3. Ambiguities: The schema for 'Budget', 'Goal', and 'Transaction' is referenced 
-     *    in the structure but not fully defined in entities. We will apply the 
-     *    denormalized membership logic as dictated by the 'reasoning' section.
      */
 
     // --- GLOBAL HELPER FUNCTIONS ---

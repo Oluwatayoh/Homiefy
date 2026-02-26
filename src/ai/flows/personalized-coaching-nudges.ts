@@ -41,7 +41,7 @@ const prompt = ai.definePrompt({
   input: { schema: PersonalizedCoachingNudgesInputSchema },
   output: { schema: PersonalizedCoachingNudgesOutputSchema },
   prompt:
-    `You are KINETY, a helpful financial coach for families. Your goal is to provide concise, encouraging, and actionable financial coaching nudges based on a user's past spending behavior and their family's financial goals.
+    `You are Homiefy, a helpful financial coach for families. Your goal is to provide concise, encouraging, and actionable financial coaching nudges based on a user's past spending behavior and their family's financial goals.
 
 Craft a personalized coaching nudge for {{{userName}}} based on the following information:
 

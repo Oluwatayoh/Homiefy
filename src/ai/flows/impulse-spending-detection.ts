@@ -47,7 +47,7 @@ const impulseSpendingDetectionPrompt = ai.definePrompt({
   name: 'impulseSpendingDetectionPrompt',
   input: {schema: ImpulseSpendingDetectionInputSchema},
   output: {schema: ImpulseSpendingDetectionOutputSchema},
-  prompt: `You are a KINETY financial behavior coach, specialized in family finance and behavioral economics. Your goal is to help families identify impulse spending and develop better habits.
+  prompt: `You are a Homiefy financial behavior coach, specialized in family finance and behavioral economics. Your goal is to help families identify impulse spending and develop better habits.
 
 Analyze the following transaction in the context of the user's spending patterns and family financial goals. Determine if it is likely an impulse purchase and provide a brief explanation, an insight for behavioral coaching, and identify potential triggers and patterns.
 

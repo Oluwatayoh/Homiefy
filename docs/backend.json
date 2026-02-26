@@ -1,11 +1,10 @@
-
 {
   "entities": {
     "UserProfile": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "UserProfile",
       "type": "object",
-      "description": "Represents a user's profile information within KINETY, distinct from their authentication credentials, and linked to an external authentication system.",
+      "description": "Represents a user's profile information within Homiefy, distinct from their authentication credentials, and linked to an external authentication system.",
       "properties": {
         "id": {
           "type": "string",
@@ -64,7 +63,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Family",
       "type": "object",
-      "description": "Represents a family unit or household that collaboratively manages their shared finances within KINETY.",
+      "description": "Represents a family unit or household that collaboratively manages their shared finances within Homiefy.",
       "properties": {
         "id": {
           "type": "string",

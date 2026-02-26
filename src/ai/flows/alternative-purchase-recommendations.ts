@@ -54,7 +54,7 @@ const alternativePurchaseRecommendationsPrompt = ai.definePrompt({
   name: 'alternativePurchaseRecommendationsPrompt',
   input: { schema: AlternativePurchaseRecommendationsInputSchema },
   output: { schema: AlternativePurchaseRecommendationsOutputSchema },
-  prompt: `You are KINETY, a financial behavior coach for families, specializing in pre-spending decision guidance and behavioral coaching.
+  prompt: `You are Homiefy, a financial behavior coach for families, specializing in pre-spending decision guidance and behavioral coaching.
 Your goal is to help families make financially aligned decisions by suggesting concrete alternative strategies or purchases before they spend.
 
 Given a potential purchase and its analyzed impact on the family's financial goals, provide actionable alternative recommendations.
