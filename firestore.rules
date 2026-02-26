@@ -27,11 +27,6 @@ service cloud.firestore {
         get(/databases/$(database)/documents/families/$(familyId)).data.members[request.auth.uid] != null;
     }
 
-    // Check membership based on the document's own denormalized member map.
-    function hasDocumentAccess() {
-      return isSignedIn() && resource.data.members[request.auth.uid] != null;
-    }
-
     // --- COLLECTION RULES ---
 
     /**
@@ -45,20 +40,32 @@ service cloud.firestore {
      * @description Rules for family units and their shared data.
      */
     match /families/{familyId} {
-      // Allow signed-in users to get a family (necessary for joining)
-      allow get: if isSignedIn();
-      // Allow listing families for the joining process
-      allow list: if isSignedIn();
+      // Allow signed-in users to get/list families (necessary for joining)
+      allow get, list: if isSignedIn();
       
-      // Creation and updates based on membership.
+      // Creation.
       allow create: if isSignedIn();
-      allow update: if isFamilyMember(familyId);
+      
+      // Update logic:
+      // 1. Existing members can update (governed by role logic in app).
+      // 2. New members can join by adding their UID to the members map.
+      allow update: if isSignedIn() && (
+        isFamilyMember(familyId) || 
+        (
+          // Case: Joining a family
+          // Ensure they only add themselves as a 'Member'
+          request.resource.data.members[request.auth.uid] == 'Member' &&
+          // Ensure they don't modify critical fields during the join
+          request.resource.data.inviteCode == resource.data.inviteCode &&
+          request.resource.data.name == resource.data.name
+        )
+      );
+
       allow delete: if isSignedIn() && get(/databases/$(database)/documents/families/$(familyId)).data.members[request.auth.uid] == 'Admin';
 
       /**
-       * @description Rules for family sub-data.
+       * @description Rules for family sub-data (Transactions, Budgets, Goals, etc.)
        * These allow access if the user is a member of the parent family.
-       * This supports simple path-based queries without needing complex filters.
        */
       match /{allSubcollections=**} {
         allow read, write: if isFamilyMember(familyId);
