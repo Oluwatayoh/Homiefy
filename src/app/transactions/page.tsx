@@ -1,24 +1,28 @@
 
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
-import { doc, collection, query, orderBy, where, deleteDoc, updateDoc } from 'firebase/firestore';
+import { doc, collection, query, orderBy, deleteDoc } from 'firebase/firestore';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Loader2, Search, Filter, ArrowUpDown, Trash2, Edit3, Eye, Calendar, User, Tag, Download } from 'lucide-react';
+import { Loader2, Search, Filter, ArrowUpDown, Trash2, Edit3, User, Tag, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import Image from 'image';
 import { cn } from '@/lib/utils';
 
 export default function TransactionHistory() {
   const { user, isUserLoading } = useUser();
   const db = useFirestore();
   const { toast } = useToast();
+
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -61,7 +65,7 @@ export default function TransactionHistory() {
     if (!confirm("Are you sure you want to delete this transaction? This will not automatically reverse budget balances.")) return;
     setIsDeleting(true);
     try {
-      await deleteDoc(doc(db, 'families', userData.familyId, 'transactions', tx.id));
+      await deleteDoc(doc(db, 'families', userData.familyId!, 'transactions', tx.id));
       toast({ title: "Transaction Deleted" });
       setSelectedTx(null);
     } catch (e: any) {
@@ -71,7 +75,7 @@ export default function TransactionHistory() {
     }
   };
 
-  if (isUserLoading || isLoading) return <div className="p-10 text-center"><Loader2 className="animate-spin mx-auto" /></div>;
+  if (isUserLoading || isLoading || !mounted) return <div className="p-10 text-center"><Loader2 className="animate-spin mx-auto" /></div>;
 
   return (
     <div className="p-6 pb-24 flex flex-col gap-6">
