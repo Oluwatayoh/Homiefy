@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser, useFirestore } from '@/firebase';
-import { doc, setDoc, collection, query, where, getDocs, updateDoc, serverTimestamp, arrayUnion } from 'firebase/firestore';
+import { doc, setDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -90,12 +90,10 @@ export default function OnboardingPage() {
       const familyDoc = querySnapshot.docs[0];
       const familyData = familyDoc.data();
       
-      // BR8.4.3: Invite code expires after 7 days
       if (new Date(familyData.inviteCodeExpires) < new Date()) {
         throw new Error("BR8.4.3: This invite code has expired. Request a new one from your admin.");
       }
 
-      // BR8.4.5: Maximum 10 members per family (MVP)
       if (Object.keys(familyData.members || {}).length >= 10) {
         throw new Error("BR8.4.5: This family has reached the maximum capacity of 10 members.");
       }
@@ -195,6 +193,7 @@ export default function OnboardingPage() {
                   <SelectItem value="USD">USD ($)</SelectItem>
                   <SelectItem value="EUR">EUR (€)</SelectItem>
                   <SelectItem value="GBP">GBP (£)</SelectItem>
+                  <SelectItem value="NGN">NGN (₦)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
