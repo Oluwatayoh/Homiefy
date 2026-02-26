@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -86,6 +87,7 @@ export default function ProfilePage() {
     setIsSaving(true);
     try {
       await setDoc(userDocRef, {
+        id: user.uid,
         firstName,
         lastName,
         displayName: `${firstName} ${lastName}`,
@@ -132,7 +134,7 @@ export default function ProfilePage() {
       if (credential) {
         localStorage.setItem('biometric_enabled', 'true');
         localStorage.setItem('biometric_email', user.email || '');
-        localStorage.setItem('biometric_cred', btoa(bioPassConfirm)); // Securely link auth for prototype
+        localStorage.setItem('biometric_cred', btoa(bioPassConfirm));
         setIsBiometricsEnabled(true);
         setShowBioPrompt(false);
         setBioPassConfirm('');
@@ -186,12 +188,12 @@ export default function ProfilePage() {
 
           <Accordion type="single" collapsible className="w-full space-y-4">
             <AccordionItem value="personal-info" className="border-none">
-              <AccordionTrigger className="p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors hover:no-underline [&>svg]:hidden">
+              <AccordionTrigger className="p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors hover:no-underline [&>svg:last-child]:hidden">
                 <div className="flex items-center gap-3">
                   <UserIcon className="h-5 w-5 text-primary" />
                   <span className="font-medium">Personal Information</span>
                 </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                <ChevronRight className="h-4 w-4 text-muted-foreground ml-auto" />
               </AccordionTrigger>
               <AccordionContent className="p-4 bg-secondary/10 rounded-b-xl space-y-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -206,13 +208,13 @@ export default function ProfilePage() {
                 </div>
                 <div className="space-y-2">
                   <Label className="text-[10px] font-bold uppercase text-muted-foreground">Mobile Number</Label>
-                  <Input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} disabled={!!userData?.phoneNumber} className="rounded-xl" />
+                  <Input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} className="rounded-xl" />
                 </div>
                 <div className="space-y-2">
                   <Label className="text-[10px] font-bold uppercase text-muted-foreground">Profile Photo</Label>
                   <div className="flex gap-2">
                     <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
-                    <Button variant="outline" size="sm" className="rounded-xl flex-1 gap-2" onClick={() => fileInputRef.current?.click()} disabled={!!editPhoto}>
+                    <Button variant="outline" size="sm" className="rounded-xl flex-1 gap-2" onClick={() => fileInputRef.current?.click()}>
                       <Upload className="h-4 w-4" /> Upload
                     </Button>
                     {editPhoto && <Button variant="ghost" size="sm" className="rounded-xl text-destructive" onClick={() => setEditPhoto(null)}><X className="h-4 w-4" /></Button>}
@@ -222,12 +224,12 @@ export default function ProfilePage() {
             </AccordionItem>
 
             <AccordionItem value="biometrics" className="border-none">
-              <AccordionTrigger className="p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors hover:no-underline [&>svg]:hidden">
+              <AccordionTrigger className="p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors hover:no-underline [&>svg:last-child]:hidden">
                 <div className="flex items-center gap-3">
                   <Fingerprint className="h-5 w-5 text-primary" />
                   <span className="font-medium">Biometric Security</span>
                 </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                <ChevronRight className="h-4 w-4 text-muted-foreground ml-auto" />
               </AccordionTrigger>
               <AccordionContent className="p-4 bg-secondary/10 rounded-b-xl space-y-4">
                 <div className="space-y-2">
@@ -253,37 +255,13 @@ export default function ProfilePage() {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="security" className="border-none">
-              <AccordionTrigger className="p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors hover:no-underline [&>svg]:hidden">
-                <div className="flex items-center gap-3">
-                  <Shield className="h-5 w-5 text-primary" />
-                  <span className="font-medium">Security & Roles</span>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </AccordionTrigger>
-              <AccordionContent className="p-4 bg-secondary/10 rounded-b-xl space-y-4">
-                <div className="p-3 rounded-lg bg-white/50 flex items-center justify-between">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase text-muted-foreground">Family Access Level</p>
-                    <p className="font-bold">{userData?.role || 'Member'}</p>
-                  </div>
-                  {userData?.role === 'Admin' && <Badge className="text-[8px]">PRIMARY</Badge>}
-                </div>
-                {userData?.role === 'Admin' && (
-                  <Button variant="outline" className="w-full rounded-xl gap-2" onClick={() => router.push('/family')}>
-                    <Settings className="h-4 w-4" /> Manage Family Governance
-                  </Button>
-                )}
-              </AccordionContent>
-            </AccordionItem>
-
             <AccordionItem value="notifications" className="border-none">
-              <AccordionTrigger className="p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors hover:no-underline [&>svg]:hidden">
+              <AccordionTrigger className="p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors hover:no-underline [&>svg:last-child]:hidden">
                 <div className="flex items-center gap-3">
                   <Bell className="h-5 w-5 text-primary" />
                   <span className="font-medium">Notifications</span>
                 </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                <ChevronRight className="h-4 w-4 text-muted-foreground ml-auto" />
               </AccordionTrigger>
               <AccordionContent className="p-4 bg-secondary/10 rounded-b-xl space-y-4">
                 <div className="flex items-center justify-between">
@@ -297,12 +275,12 @@ export default function ProfilePage() {
             </AccordionItem>
 
             <AccordionItem value="preferences" className="border-none">
-              <AccordionTrigger className="p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors hover:no-underline [&[data-state=open]>svg]:rotate-90">
+              <AccordionTrigger className="p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors hover:no-underline [&>svg:last-child]:hidden">
                 <div className="flex items-center gap-3">
                   <Settings className="h-5 w-5 text-primary" />
                   <span className="font-medium">Preferences</span>
                 </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform duration-200" />
+                <ChevronRight className="h-4 w-4 text-muted-foreground ml-auto transition-transform duration-200" />
               </AccordionTrigger>
               <AccordionContent className="p-4 bg-secondary/10 rounded-b-xl space-y-4">
                 <div className="space-y-3">
@@ -321,7 +299,7 @@ export default function ProfilePage() {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <Label className="text-[10px] font-bold uppercase text-muted-foreground">Alert Threshold</Label>
-                    <span className="text-xs font-bold text-primary">{alertThreshold}%</span>
+                    <span className="text-xs font-bold text-primary">{alertThreshold[0]}%</span>
                   </div>
                   <Slider value={alertThreshold} onValueChange={setAlertThreshold} max={100} step={5} className="py-4" />
                 </div>

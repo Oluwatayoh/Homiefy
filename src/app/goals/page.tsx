@@ -1,9 +1,10 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, addDoc, serverTimestamp } from 'firebase/firestore';
+import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
+import { collection, query, orderBy, addDoc, doc } from 'firebase/firestore';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Target, Calendar, TrendingUp, Plus, Loader2, Sparkles, Goal as GoalIcon } from 'lucide-react';
+import { Target, Calendar, TrendingUp, Plus, Loader2, Sparkles, Goal as GoalIcon, PlusCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function GoalsPage() {
@@ -36,7 +37,7 @@ export default function GoalsPage() {
   }, []);
 
   const { data: userData } = useDoc(useMemoFirebase(() => {
-    return user ? doc(db, 'users', user.uid) : null;
+    return user ? doc(db, 'userProfiles', user.uid) : null;
   }, [user, db]));
 
   const goalsQuery = useMemoFirebase(() => {
@@ -217,6 +218,3 @@ export default function GoalsPage() {
     </div>
   );
 }
-
-import { doc, getDoc } from 'firebase/firestore';
-import { useDoc } from '@/firebase';

@@ -8,6 +8,7 @@ import { doc, setDoc, collection, query, where, getDocs, updateDoc } from 'fireb
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, Users, UserPlus, ArrowRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
