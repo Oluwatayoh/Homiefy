@@ -55,7 +55,8 @@ export default function LandingPage() {
   };
 
   const validatePhone = (phone: string) => {
-    return phone === '' || /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/im.test(phone);
+    // Allows + prefix, optional spaces/dashes/dots, and 10-15 digits
+    return phone === '' || /^[\+]?[0-9\s\-\.]{10,15}$/.test(phone);
   };
 
   const validatePasswordStrength = (pass: string) => {
@@ -100,7 +101,7 @@ export default function LandingPage() {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           preferences: {
-            currency: 'NGN',
+            currency: 'USD',
             alertThreshold: 80,
             pushNotifications: true
           }
@@ -126,12 +127,12 @@ export default function LandingPage() {
     }
 
     if (!validatePhone(phoneNumber)) {
-      newErrors.phone = "Invalid phone number format";
+      newErrors.phone = "Invalid format (e.g., +1234567890)";
     }
 
     const passStrength = validatePasswordStrength(password);
     if (!passStrength.isValid) {
-      newErrors.password = "Password must be at least 8 chars with upper, lower, number, and special char";
+      newErrors.password = "Requires 8+ chars, upper, lower, digit, & symbol";
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -161,7 +162,7 @@ export default function LandingPage() {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         preferences: {
-          currency: 'NGN',
+          currency: 'USD',
           alertThreshold: 80,
           pushNotifications: true
         }
@@ -205,7 +206,7 @@ export default function LandingPage() {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           preferences: {
-            currency: 'NGN',
+            currency: 'USD',
             alertThreshold: 80,
             pushNotifications: true
           }
@@ -261,7 +262,7 @@ export default function LandingPage() {
     let message = 'An unexpected error occurred.';
     if (error instanceof FirebaseError) {
       if (error.code === 'auth/operation-not-allowed') {
-        message = 'Google sign-in is not enabled. Please check console.';
+        message = 'Google sign-in is not enabled.';
       } else if (error.code === 'auth/email-already-in-use') {
         message = 'This email is already registered.';
       } else if (error.code === 'auth/invalid-credential') {
@@ -398,7 +399,7 @@ export default function LandingPage() {
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input 
                     type="tel" 
-                    placeholder="+234..." 
+                    placeholder="+1234567890" 
                     className={cn("pl-10 h-12 rounded-xl", errors.phone && "border-red-500")} 
                     value={phoneNumber} 
                     onChange={(e) => setPhoneNumber(e.target.value)} 
