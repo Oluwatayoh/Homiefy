@@ -61,9 +61,9 @@ export default function Dashboard() {
 
   const txQuery = useMemoFirebase(() => {
     if (!userData?.familyId || !user?.uid) return null;
-    // We target the specific family's transaction subcollection
     return query(
       collection(db, 'families', userData.familyId, 'transactions'),
+      where(`members.${user.uid}`, '!=', null),
       orderBy('date', 'desc'),
       limit(5)
     );
@@ -75,6 +75,7 @@ export default function Dashboard() {
     if (!userData?.familyId || !user?.uid) return null;
     return query(
       collection(db, 'families', userData.familyId, 'goals'),
+      where(`members.${user.uid}`, '!=', null),
       orderBy('createdAt', 'desc'),
       limit(3)
     );
@@ -86,6 +87,7 @@ export default function Dashboard() {
     if (!userData?.familyId || !user?.uid) return null;
     return query(
       collection(db, 'families', userData.familyId, 'decisions'),
+      where(`members.${user.uid}`, '!=', null),
       orderBy('timestamp', 'desc'),
       limit(10)
     );
@@ -103,12 +105,14 @@ export default function Dashboard() {
     if (isStaff) {
       return query(
         baseCol,
+        where(`members.${user.uid}`, '!=', null),
         where('status', '==', 'Pending'),
         orderBy('requestedAt', 'desc')
       );
     } else {
       return query(
         baseCol,
+        where(`members.${user.uid}`, '!=', null),
         where('requesterId', '==', user.uid),
         where('status', '==', 'Pending'),
         orderBy('requestedAt', 'desc')

@@ -42,8 +42,7 @@ service cloud.firestore {
      * @description Rules for family units and their shared data.
      */
     match /families/{familyId} {
-      // Allow any signed-in user to 'get' families (necessary for joining via code).
-      // 'list' is also allowed but should be used sparingly.
+      // Allow any signed-in user to 'get' or 'list' families (necessary for joining via code).
       allow get, list: if isSignedIn();
       
       // Only the creator can create the family.
