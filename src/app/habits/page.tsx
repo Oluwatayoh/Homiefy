@@ -1,6 +1,5 @@
-
 import { FAMILY_DATA } from '@/app/lib/mock-data';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { BrainCircuit, Sparkles, TrendingDown, History, Info } from 'lucide-react';
 import { personalizedCoachingNudges } from '@/ai/flows/personalized-coaching-nudges';
@@ -35,14 +34,14 @@ export default async function HabitIntelligence() {
             "{nudge.nudgeMessage}"
           </p>
           <div className="mt-6 flex items-center gap-2 text-xs font-bold text-white/80">
-             <Info className="h-4 w-4" /> Based on your last 30 days
+             <span className="inline-block p-1 bg-white/10 rounded-full"><Info className="h-3 w-3" /></span> Based on your last 30 days
           </div>
         </CardContent>
       </Card>
 
       <section className="space-y-4">
         <h3 className="font-semibold px-1">Spending Volatility</h3>
-        <Card className="border-none shadow-sm bg-white p-4">
+        <Card className="border-none shadow-sm p-4 bg-card">
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Stability Score</p>
@@ -64,7 +63,7 @@ export default async function HabitIntelligence() {
             { label: 'Weekend Evenings', value: 'Social pressure', icon: History, color: 'text-amber-500' },
             { label: 'Late Night Apps', value: 'Boredom', icon: History, color: 'text-blue-500' },
           ].map((trigger, i) => (
-            <div key={i} className="flex items-center justify-between p-4 rounded-xl bg-white shadow-sm">
+            <div key={i} className="flex items-center justify-between p-4 rounded-xl bg-card shadow-sm border">
               <div className="flex items-center gap-3">
                 <trigger.icon className={`h-5 w-5 ${trigger.color}`} />
                 <div>

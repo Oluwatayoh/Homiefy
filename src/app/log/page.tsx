@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { impulseSpendingDetection, type ImpulseSpendingDetectionOutput } from '@/ai/flows/impulse-spending-detection';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, updateDoc, addDoc } from 'firebase/firestore';
 import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -13,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Loader2, Plus, Smile, Meh, Frown, Sparkles, Brain, Camera, X, ShieldAlert, AlertTriangle } from 'lucide-react';
+import { Loader2, Plus, Smile, Meh, Frown, Camera, X, ShieldAlert } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -228,16 +227,16 @@ export default function RapidLog() {
     }
   }
 
-  if (isUserLoading || !mounted) return <div className="p-10 text-center"><Loader2 className="animate-spin mx-auto" /></div>;
+  if (isUserLoading || !mounted) return <div className="p-10 text-center bg-background"><Loader2 className="animate-spin mx-auto text-primary" /></div>;
 
   return (
-    <div className="p-6 pb-24 flex flex-col gap-6">
+    <div className="p-6 pb-24 flex flex-col gap-6 bg-background">
       <header>
         <h1 className="text-2xl font-bold font-headline">Rapid Log</h1>
         <p className="text-muted-foreground text-sm">Lightning fast record keeping.</p>
       </header>
 
-      <Card className="border-none shadow-xl p-6 space-y-6">
+      <Card className="border-none shadow-xl p-6 space-y-6 bg-card">
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
             <label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Amount</label>
@@ -246,7 +245,7 @@ export default function RapidLog() {
               <Input 
                 type="number" 
                 placeholder="0.00" 
-                className={cn("pl-8 h-14 text-xl font-bold rounded-xl", !isAmountValid && amount !== '' && "border-red-500")}
+                className={cn("pl-8 h-14 text-xl font-bold rounded-xl bg-background", !isAmountValid && amount !== '' && "border-red-500")}
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
               />
@@ -255,7 +254,7 @@ export default function RapidLog() {
           <div className="space-y-1">
             <label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Category</label>
             <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="h-14 rounded-xl font-medium">
+              <SelectTrigger className="h-14 rounded-xl font-medium bg-background">
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
               <SelectContent>
@@ -271,7 +270,7 @@ export default function RapidLog() {
           <label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Description</label>
           <Input 
             placeholder="What did you buy?" 
-            className="h-12 rounded-xl"
+            className="h-12 rounded-xl bg-background"
             value={desc}
             onChange={(e) => setDesc(e.target.value)}
           />
@@ -281,7 +280,7 @@ export default function RapidLog() {
           <label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Date</label>
           <Input 
             type="date" 
-            className={cn("h-12 rounded-xl", isFutureDate && "border-red-500")}
+            className={cn("h-12 rounded-xl bg-background", isFutureDate && "border-red-500")}
             value={date}
             onChange={(e) => setDate(e.target.value)}
           />
@@ -293,13 +292,13 @@ export default function RapidLog() {
           {!receiptPhoto ? (
             <Button 
               variant="outline" 
-              className="w-full h-12 border-dashed rounded-xl gap-2"
+              className="w-full h-12 border-dashed rounded-xl gap-2 bg-background"
               onClick={() => setShowCamera(true)}
             >
               <Camera className="h-5 w-5" /> Add Receipt Photo
             </Button>
           ) : (
-            <div className="relative w-full aspect-video rounded-xl overflow-hidden group">
+            <div className="relative w-full aspect-video rounded-xl overflow-hidden group border">
               <Image src={receiptPhoto} alt="Receipt" fill className="object-cover" />
               <button 
                 onClick={() => setReceiptPhoto(null)}
@@ -322,11 +321,12 @@ export default function RapidLog() {
               <button
                 key={s.id}
                 onClick={() => setSentiment(s.id as any)}
-                className={`flex-1 flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all ${
-                  sentiment === s.id ? 'border-primary bg-primary/5' : 'border-transparent bg-secondary/50'
-                }`}
+                className={cn(
+                  "flex-1 flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all bg-background",
+                  sentiment === s.id ? 'border-primary ring-2 ring-primary/20' : 'border-transparent'
+                )}
               >
-                <s.icon className={`h-8 w-8 ${s.color}`} />
+                <s.icon className={cn("h-8 w-8", s.color)} />
               </button>
             ))}
           </div>
@@ -345,7 +345,7 @@ export default function RapidLog() {
         <Button 
           className={cn(
             "w-full h-14 rounded-xl text-lg font-bold shadow-lg mt-4",
-            isOverThreshold ? "bg-amber-600 hover:bg-amber-700" : ""
+            isOverThreshold ? "bg-amber-600 hover:bg-amber-700 text-white" : ""
           )}
           onClick={handleLogOrRequest}
           disabled={loading || !desc || !isAmountValid || !category || isFutureDate}
@@ -356,7 +356,7 @@ export default function RapidLog() {
       </Card>
 
       <Dialog open={showApprovalModal} onOpenChange={setShowApprovalModal}>
-        <DialogContent className="max-w-md rounded-2xl">
+        <DialogContent className="max-w-md rounded-2xl bg-card">
           <DialogHeader>
             <DialogTitle>Spending Justification</DialogTitle>
             <DialogDescription>
@@ -368,13 +368,13 @@ export default function RapidLog() {
               placeholder="e.g. Urgent car repair needed for work commute." 
               value={justification}
               onChange={(e) => setJustification(e.target.value)}
-              className="min-h-[100px] rounded-xl"
+              className="min-h-[100px] rounded-xl bg-background"
               maxLength={200}
             />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowApprovalModal(false)} className="rounded-xl">Cancel</Button>
-            <Button onClick={submitApprovalRequest} disabled={loading} className="rounded-xl bg-amber-600">
+            <Button onClick={submitApprovalRequest} disabled={loading} className="rounded-xl bg-amber-600 text-white">
               Submit Request
             </Button>
           </DialogFooter>
@@ -385,12 +385,13 @@ export default function RapidLog() {
         <div className="fixed inset-0 bg-black z-[100] flex flex-col">
           <div className="p-4 flex justify-between items-center text-white">
             <h2 className="font-bold">Capture Receipt</h2>
-            <Button variant="ghost" size="icon" onClick={() => setShowCamera(false)}><X className="h-6 w-6" /></Button>
+            <Button variant="ghost" size="icon" onClick={() => setShowCamera(false)} className="text-white hover:bg-white/10"><X className="h-6 w-6" /></Button>
           </div>
           <div className="flex-1 relative bg-neutral-900 flex items-center justify-center">
             <video ref={videoRef} className="w-full h-full object-contain" autoPlay muted playsInline />
             {hasCameraPermission === false && (
               <Alert variant="destructive" className="absolute mx-6">
+                <ShieldAlert className="h-4 w-4" />
                 <AlertTitle>Camera Access Required</AlertTitle>
                 <AlertDescription>Please allow camera access in settings.</AlertDescription>
               </Alert>

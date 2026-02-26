@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from 'next/link';
@@ -24,7 +23,7 @@ export default function MobileNav() {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white border-t border-border flex justify-around items-center h-16 px-2 z-50">
+    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-card border-t border-border flex justify-around items-center h-16 px-2 z-50">
       {navItems.map((item) => {
         const isActive = pathname === item.href;
         return (

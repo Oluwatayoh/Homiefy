@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Zap, ShieldCheck, Mail, Lock, Phone, Loader2, Fingerprint, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Zap, ShieldCheck, Mail, Lock, Phone, Loader2, Fingerprint, Eye, EyeOff } from 'lucide-react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -81,7 +81,7 @@ export default function LandingPage() {
   const saveBiometricCreds = (email: string, pass: string) => {
     if (localStorage.getItem('biometric_enabled') === 'true') {
       localStorage.setItem('biometric_email', email);
-      localStorage.setItem('biometric_cred', btoa(pass)); // Basic encoding for prototype demonstration
+      localStorage.setItem('biometric_cred', btoa(pass)); 
     }
   };
 
@@ -250,7 +250,7 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="flex flex-col items-center min-h-screen px-6 py-12 bg-white">
+    <div className="flex flex-col items-center min-h-screen px-6 py-12 bg-background">
       <div className="mb-8 flex flex-col items-center">
         <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mb-4 shadow-lg">
           <Zap className="text-white w-10 h-10" />
@@ -275,7 +275,7 @@ export default function LandingPage() {
                   <Input 
                     type="email" 
                     placeholder="name@example.com" 
-                    className="pl-10 h-12 rounded-xl" 
+                    className="pl-10 h-12 rounded-xl bg-card" 
                     value={email} 
                     onChange={(e) => setEmail(e.target.value)} 
                     required 
@@ -290,7 +290,7 @@ export default function LandingPage() {
                   <Input 
                     type={showLoginPassword ? "text" : "password"}
                     placeholder="••••••••" 
-                    className="pl-10 pr-10 h-12 rounded-xl" 
+                    className="pl-10 pr-10 h-12 rounded-xl bg-card" 
                     value={password} 
                     onChange={(e) => setPassword(e.target.value)} 
                     required 
@@ -334,7 +334,7 @@ export default function LandingPage() {
                   <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">First Name</Label>
                   <Input 
                     placeholder="Jane" 
-                    className={cn("h-12 rounded-xl", errors.firstName && "border-red-500")} 
+                    className={cn("h-12 rounded-xl bg-card", errors.firstName && "border-red-500")} 
                     value={firstName} 
                     onChange={(e) => setFirstName(e.target.value)} 
                     disabled={loading}
@@ -344,7 +344,7 @@ export default function LandingPage() {
                   <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Last Name</Label>
                   <Input 
                     placeholder="Doe" 
-                    className={cn("h-12 rounded-xl", errors.lastName && "border-red-500")} 
+                    className={cn("h-12 rounded-xl bg-card", errors.lastName && "border-red-500")} 
                     value={lastName} 
                     onChange={(e) => setLastName(e.target.value)} 
                     disabled={loading}
@@ -359,7 +359,7 @@ export default function LandingPage() {
                   <Input 
                     type="email" 
                     placeholder="name@example.com" 
-                    className={cn("pl-10 h-12 rounded-xl", errors.email && "border-red-500")} 
+                    className={cn("pl-10 h-12 rounded-xl bg-card", errors.email && "border-red-500")} 
                     value={email} 
                     onChange={(e) => setEmail(e.target.value)} 
                     disabled={loading}
@@ -374,7 +374,7 @@ export default function LandingPage() {
                   <Input 
                     type="tel" 
                     placeholder="+1234567890" 
-                    className={cn("pl-10 h-12 rounded-xl", errors.phone && "border-red-500")} 
+                    className={cn("pl-10 h-12 rounded-xl bg-card", errors.phone && "border-red-500")} 
                     value={phoneNumber} 
                     onChange={(e) => setPhoneNumber(e.target.value)} 
                     disabled={loading}
@@ -389,7 +389,7 @@ export default function LandingPage() {
                   <Input 
                     type={showSignupPassword ? "text" : "password"}
                     placeholder="Min 8 characters" 
-                    className={cn("pl-10 pr-10 h-12 rounded-xl", errors.password && "border-red-500")} 
+                    className={cn("pl-10 pr-10 h-12 rounded-xl bg-card", errors.password && "border-red-500")} 
                     value={password} 
                     onChange={(e) => setPassword(e.target.value)} 
                     disabled={loading}
@@ -415,10 +415,10 @@ export default function LandingPage() {
 
         <div className="relative">
           <div className="absolute inset-0 flex items-center"><span className="w-full border-t"></span></div>
-          <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-muted-foreground font-bold">Or</span></div>
+          <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground font-bold">Or</span></div>
         </div>
 
-        <Button variant="outline" onClick={handleGoogleLogin} className="w-full h-12 rounded-xl font-bold gap-2 border-2" disabled={loading}>
+        <Button variant="outline" onClick={handleGoogleLogin} className="w-full h-12 rounded-xl font-bold gap-2 border-2 bg-card" disabled={loading}>
           {loading ? <Loader2 className="animate-spin h-5 w-5" /> : (
             <>
               <svg className="h-5 w-5" viewBox="0 0 24 24">

@@ -9,8 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, AlertTriangle, ArrowRightCircle, Target, Sparkles, Brain, Clock, ShieldCheck, CheckCircle2, AlertCircle } from 'lucide-react';
-import { Progress } from '@/components/ui/progress';
+import { Loader2, ArrowRightCircle, Target, Sparkles, Brain, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
@@ -160,26 +159,26 @@ export default function PreSpendTool() {
     }
   }
 
-  if (isUserLoading || !mounted) return <div className="p-10 text-center"><Loader2 className="animate-spin mx-auto text-primary" /></div>;
+  if (isUserLoading || !mounted) return <div className="p-10 text-center bg-background"><Loader2 className="animate-spin mx-auto text-primary" /></div>;
 
   return (
-    <div className="p-6 pb-24 flex flex-col gap-6">
+    <div className="p-6 pb-24 flex flex-col gap-6 bg-background">
       <header>
         <h1 className="text-2xl font-bold font-headline">Decision Intel</h1>
         <p className="text-muted-foreground text-sm">Pre-spending behavioral coaching.</p>
       </header>
 
       {!budgetData && (
-        <div className="p-6 rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 text-center space-y-4">
+        <div className="p-6 rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 text-center space-y-4 shadow-sm">
           <AlertCircle className="w-12 h-12 text-amber-600 mx-auto" />
           <h2 className="font-bold">Active Budget Required</h2>
           <p className="text-sm text-amber-700 dark:text-amber-400">We need your current monthly budget to analyze spending impact.</p>
-          <Button onClick={() => router.push('/budget')}>Create Budget</Button>
+          <Button onClick={() => router.push('/budget')} className="rounded-xl">Create Budget</Button>
         </div>
       )}
 
       {budgetData && !result ? (
-        <Card className="border-none shadow-xl bg-white dark:bg-card overflow-hidden">
+        <Card className="border-none shadow-xl bg-card overflow-hidden">
           <CardHeader className="bg-primary text-white">
             <CardTitle className="flex items-center gap-2">
               <Brain className="h-5 w-5" /> Spending Analysis
@@ -199,14 +198,14 @@ export default function PreSpendTool() {
                     placeholder="0.00" 
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
-                    className="pl-8 h-12 rounded-xl"
+                    className="pl-8 h-12 rounded-xl bg-background"
                   />
                 </div>
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-bold uppercase text-muted-foreground">Category</label>
                 <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger className="h-12 rounded-xl">
+                  <SelectTrigger className="h-12 rounded-xl bg-background">
                     <SelectValue placeholder="Envelope" />
                   </SelectTrigger>
                   <SelectContent>
@@ -224,7 +223,7 @@ export default function PreSpendTool() {
                 placeholder="What are you considering?" 
                 value={purchaseName}
                 onChange={(e) => setPurchaseName(e.target.value)}
-                className="h-12 rounded-xl"
+                className="h-12 rounded-xl bg-background"
               />
             </div>
 
@@ -256,7 +255,7 @@ export default function PreSpendTool() {
         </Card>
       ) : result && (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <Card className="border-none shadow-xl overflow-hidden">
+          <Card className="border-none shadow-xl overflow-hidden bg-card">
             <div className={cn(
               "p-4 text-white flex justify-between items-center",
               result.recommendationType === 'Proceed Confidently' ? 'bg-emerald-600' :
@@ -273,7 +272,7 @@ export default function PreSpendTool() {
             </div>
             
             <CardContent className="p-6 space-y-6">
-              <div className="p-4 rounded-xl bg-secondary/30">
+              <div className="p-4 rounded-xl bg-secondary/30 border">
                 <h3 className="text-xs font-bold uppercase text-muted-foreground mb-1">Guidance</h3>
                 <p className="text-sm font-medium leading-relaxed">{result.decisionGuidance}</p>
               </div>
@@ -294,7 +293,7 @@ export default function PreSpendTool() {
                   <h3 className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Goal Analysis</h3>
                   <div className="space-y-2">
                     {result.goalImpacts.map((gi, idx) => (
-                      <div key={idx} className="flex items-start gap-3 p-3 rounded-lg border bg-white dark:bg-card shadow-sm">
+                      <div key={idx} className="flex items-start gap-3 p-3 rounded-lg border bg-background shadow-sm">
                         <Target className="h-5 w-5 text-accent shrink-0 mt-0.5" />
                         <div>
                           <p className="text-xs font-bold">{gi.goalName}</p>
@@ -315,7 +314,7 @@ export default function PreSpendTool() {
                 <h3 className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Smart Alternatives</h3>
                 <div className="grid gap-2">
                   {result.alternativeRecommendations.map((rec, idx) => (
-                    <div key={idx} className="flex items-center gap-2 text-xs font-medium bg-secondary/10 p-3 rounded-lg border-l-4 border-primary">
+                    <div key={idx} className="flex items-center gap-2 text-xs font-medium bg-secondary/10 p-3 rounded-lg border border-l-4 border-l-primary">
                       <ArrowRightCircle className="h-4 w-4 text-primary" />
                       {rec}
                     </div>
@@ -325,7 +324,7 @@ export default function PreSpendTool() {
 
               <div className="flex flex-col gap-2 pt-4">
                 <Button 
-                  className="h-12 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-700"
+                  className="h-12 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-700 text-white"
                   onClick={() => handleAction('proceeded')}
                 >
                   <CheckCircle2 className="mr-2 h-4 w-4" /> Proceed with Purchase

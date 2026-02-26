@@ -85,16 +85,16 @@ export default function TransactionHistory() {
     }
   };
 
-  if (isUserLoading || isLoading || !mounted) return <div className="p-10 text-center"><Loader2 className="animate-spin mx-auto" /></div>;
+  if (isUserLoading || isLoading || !mounted) return <div className="p-10 text-center bg-background"><Loader2 className="animate-spin mx-auto text-primary" /></div>;
 
   return (
-    <div className="p-6 pb-24 flex flex-col gap-6">
+    <div className="p-6 pb-24 flex flex-col gap-6 bg-background">
       <header className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold font-headline">History</h1>
           <p className="text-muted-foreground text-sm">Family transaction records.</p>
         </div>
-        <Button variant="outline" size="icon" className="rounded-full">
+        <Button variant="outline" size="icon" className="rounded-full bg-card">
           <Download className="h-4 w-4" />
         </Button>
       </header>
@@ -103,15 +103,15 @@ export default function TransactionHistory() {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Search description or member..." 
-            className="pl-10 h-11 rounded-xl"
+            placeholder="Search description..." 
+            className="pl-10 h-11 rounded-xl bg-card"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
         <div className="flex gap-2">
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="flex-1 rounded-xl">
+            <SelectTrigger className="flex-1 rounded-xl bg-card">
               <Filter className="h-4 w-4 mr-2" />
               <SelectValue placeholder="Category" />
             </SelectTrigger>
@@ -123,7 +123,7 @@ export default function TransactionHistory() {
           <Button 
             variant="outline" 
             onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
-            className="rounded-xl px-3"
+            className="rounded-xl px-3 bg-card"
           >
             <ArrowUpDown className="h-4 w-4 mr-2" />
             {sortOrder === 'desc' ? 'Newest' : 'Oldest'}
@@ -135,7 +135,7 @@ export default function TransactionHistory() {
         {filteredTransactions.map((tx) => (
           <Card 
             key={tx.id} 
-            className="border-none shadow-sm cursor-pointer hover:bg-secondary/20 transition-colors"
+            className="border-none shadow-sm cursor-pointer hover:bg-primary/5 transition-colors bg-card"
             onClick={() => setSelectedTx(tx)}
           >
             <CardContent className="p-4 flex items-center justify-between">
@@ -152,7 +152,7 @@ export default function TransactionHistory() {
               </div>
               <div className="text-right">
                 <p className="text-sm font-bold text-primary">{currencySymbol}{tx.amount?.toFixed(2)}</p>
-                <Badge variant="secondary" className="text-[8px] px-1 py-0 h-4">
+                <Badge variant="secondary" className="text-[8px] px-1 py-0 h-4 border-none">
                   {tx.category}
                 </Badge>
               </div>
@@ -167,7 +167,7 @@ export default function TransactionHistory() {
       </div>
 
       <Dialog open={!!selectedTx} onOpenChange={(open) => !open && setSelectedTx(null)}>
-        <DialogContent className="max-w-md rounded-2xl">
+        <DialogContent className="max-w-md rounded-2xl bg-card">
           <DialogHeader>
             <DialogTitle>Transaction Details</DialogTitle>
             <DialogDescription>
@@ -178,11 +178,11 @@ export default function TransactionHistory() {
           {selectedTx && (
             <div className="space-y-6 pt-4">
               <div className="grid grid-cols-2 gap-4">
-                <div className="p-3 rounded-xl bg-secondary/30">
+                <div className="p-3 rounded-xl bg-secondary/30 border">
                   <p className="text-[10px] font-bold uppercase text-muted-foreground">Amount</p>
                   <p className="text-xl font-bold">{currencySymbol}{selectedTx.amount?.toFixed(2)}</p>
                 </div>
-                <div className="p-3 rounded-xl bg-secondary/30">
+                <div className="p-3 rounded-xl bg-secondary/30 border">
                   <p className="text-[10px] font-bold uppercase text-muted-foreground">Category</p>
                   <p className="text-lg font-bold">{selectedTx.category}</p>
                 </div>
@@ -201,7 +201,7 @@ export default function TransactionHistory() {
               {selectedTx.receiptPhoto && (
                 <div className="space-y-2">
                   <p className="text-[10px] font-bold uppercase text-muted-foreground">Receipt Photo</p>
-                  <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden shadow-md">
+                  <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden shadow-md border">
                     <img src={selectedTx.receiptPhoto} alt="Receipt" className="object-cover w-full h-full" />
                   </div>
                 </div>
@@ -212,7 +212,7 @@ export default function TransactionHistory() {
                   <>
                     <Button 
                       variant="destructive" 
-                      className="flex-1 rounded-xl"
+                      className="flex-1 rounded-xl text-white"
                       onClick={() => handleDelete(selectedTx)}
                       disabled={isDeleting}
                     >
@@ -220,7 +220,7 @@ export default function TransactionHistory() {
                     </Button>
                     <Button 
                       variant="outline" 
-                      className="flex-1 rounded-xl"
+                      className="flex-1 rounded-xl bg-card"
                       onClick={() => toast({ title: "Edit mode coming soon" })}
                     >
                       <Edit3 className="h-4 w-4 mr-2" /> Edit
