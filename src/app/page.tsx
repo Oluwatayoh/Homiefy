@@ -178,10 +178,14 @@ export default function LandingPage() {
       }
     } catch (error: any) {
       console.error("Biometric login failed:", error);
+      let message = 'Could not verify identity. Please use your password.';
+      if (error.name === 'NotAllowedError') {
+        message = 'Biometric sign-in is restricted by the browser in this context (e.g. inside an iframe).';
+      }
       toast({ 
         variant: 'destructive', 
         title: 'Biometric Failed', 
-        description: 'Could not verify identity. Please use your password.' 
+        description: message 
       });
     } finally {
       setLoading(false);

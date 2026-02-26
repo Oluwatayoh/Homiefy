@@ -143,10 +143,14 @@ export default function ProfilePage() {
       }
     } catch (error: any) {
       console.error("Biometric registration failed:", error);
+      let message = "Your device might not support this or the request was cancelled.";
+      if (error.name === 'NotAllowedError') {
+        message = 'Biometric registration is restricted by the browser in this context (e.g. inside an iframe).';
+      }
       toast({ 
         variant: "destructive", 
         title: "Registration Failed", 
-        description: "Your device might not support this or the request was cancelled." 
+        description: message 
       });
     }
   };
