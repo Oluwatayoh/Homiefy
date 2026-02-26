@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Zap, AlertTriangle, ArrowRightCircle, Target, Sparkles, Brain, Clock, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { Loader2, Zap, AlertTriangle, ArrowRightCircle, Target, Sparkles, Brain, Clock, ShieldCheck, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -68,6 +68,12 @@ export default function PreSpendTool() {
   }, [budgetData]);
 
   async function handleAnalyze() {
+    // BR8.5.1: Decision check requires active budget
+    if (!budgetData) {
+      toast({ variant: "destructive", title: "Active Budget Required", description: "BR8.5.1: You must have an active budget for the current month to use the Decision Intel engine." });
+      return;
+    }
+
     if (!purchaseName || !amount || !category || !userData?.familyId) return;
     setLoading(true);
     try {
@@ -144,7 +150,16 @@ export default function PreSpendTool() {
         <p className="text-muted-foreground text-sm">Pre-spending behavioral coaching.</p>
       </header>
 
-      {!result ? (
+      {!budgetData && (
+        <div className="p-6 rounded-2xl bg-amber-50 border border-amber-200 text-center space-y-4">
+          <AlertCircle className="w-12 h-12 text-amber-600 mx-auto" />
+          <h2 className="font-bold">Active Budget Required</h2>
+          <p className="text-sm text-amber-700">According to Business Rule 8.5.1, we need your current monthly budget to analyze spending impact.</p>
+          <Button onClick={() => router.push('/budget')}>Create Budget</Button>
+        </div>
+      )}
+
+      {budgetData && !result ? (
         <Card className="border-none shadow-xl bg-white overflow-hidden">
           <CardHeader className="bg-primary text-white">
             <CardTitle className="flex items-center gap-2">
@@ -220,7 +235,7 @@ export default function PreSpendTool() {
             </Button>
           </CardContent>
         </Card>
-      ) : (
+      ) : result && (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <Card className="border-none shadow-xl overflow-hidden">
             <div className={cn(

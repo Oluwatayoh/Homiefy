@@ -90,9 +90,14 @@ export default function OnboardingPage() {
       const familyDoc = querySnapshot.docs[0];
       const familyData = familyDoc.data();
       
-      // Check expiry
+      // BR8.4.3: Invite code expires after 7 days
       if (new Date(familyData.inviteCodeExpires) < new Date()) {
-        throw new Error("Invite code has expired.");
+        throw new Error("BR8.4.3: This invite code has expired. Request a new one from your admin.");
+      }
+
+      // BR8.4.5: Maximum 10 members per family (MVP)
+      if (Object.keys(familyData.members || {}).length >= 10) {
+        throw new Error("BR8.4.5: This family has reached the maximum capacity of 10 members.");
       }
 
       await updateDoc(familyDoc.ref, {
@@ -107,7 +112,7 @@ export default function OnboardingPage() {
       toast({ title: "Joined Family!", description: `You are now a member of ${familyData.name}.` });
       router.push('/dashboard');
     } catch (error: any) {
-      toast({ variant: "destructive", title: "Error", description: error.message });
+      toast({ variant: "destructive", title: "Join Failed", description: error.message });
     } finally {
       setLoading(false);
     }
@@ -195,7 +200,7 @@ export default function OnboardingPage() {
             </div>
             <div className="flex gap-3 pt-2">
               <Button variant="outline" className="flex-1" onClick={() => setMode('selection')}>Back</Button>
-              <Button className="flex-1" onClick={handleCreateFamily} disabled={!familyName}>Create</Button>
+              <Button className="flex-1" onClick={handleCreateFamily} disabled={!familyName || familyName.length < 3}>Create</Button>
             </div>
           </CardContent>
         </Card>

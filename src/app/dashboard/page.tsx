@@ -187,14 +187,21 @@ export default function Dashboard() {
   }, [user, isUserLoading, userData, isUserDataLoading, router]);
 
   const handleDecision = async (status: 'Approved' | 'Denied') => {
-    if (!selectedApproval || !userData?.familyId) return;
+    if (!selectedApproval || !userData?.familyId || !user) return;
+    
+    // BR8.3.2: User cannot approve own request
+    if (selectedApproval.requesterId === user.uid) {
+      toast({ variant: "destructive", title: "Rule Violation", description: "BR8.3.2: You cannot approve your own spending request." });
+      return;
+    }
+
     setIsProcessing(true);
     try {
       const approvalRef = doc(db, 'families', userData.familyId, 'approvals', selectedApproval.id);
       
       await updateDoc(approvalRef, {
         status,
-        approverId: user!.uid,
+        approverId: user.uid,
         resolvedAt: new Date().toISOString()
       });
 
@@ -600,22 +607,31 @@ export default function Dashboard() {
 
               {isStaff ? (
                 <div className="flex flex-col gap-2 pt-4">
-                  <Button 
-                    className="h-12 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-700"
-                    onClick={() => handleDecision('Approved')}
-                    disabled={isProcessing}
-                  >
-                    {isProcessing ? <Loader2 className="animate-spin mr-2" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                    Approve Spending
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    className="h-12 rounded-xl font-bold border-destructive text-destructive hover:bg-destructive/10"
-                    onClick={() => handleDecision('Denied')}
-                    disabled={isProcessing}
-                  >
-                    <XCircle className="mr-2 h-4 w-4" /> Deny Request
-                  </Button>
+                  {selectedApproval.requesterId === user?.uid ? (
+                    <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-center">
+                      <p className="text-xs font-bold text-amber-900">Self-Review Restricted</p>
+                      <p className="text-[10px] text-amber-700">BR8.3.2: You cannot approve your own request. Another lead must review this.</p>
+                    </div>
+                  ) : (
+                    <>
+                      <Button 
+                        className="h-12 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-700"
+                        onClick={() => handleDecision('Approved')}
+                        disabled={isProcessing}
+                      >
+                        {isProcessing ? <Loader2 className="animate-spin mr-2" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+                        Approve Spending
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        className="h-12 rounded-xl font-bold border-destructive text-destructive hover:bg-destructive/10"
+                        onClick={() => handleDecision('Denied')}
+                        disabled={isProcessing}
+                      >
+                        <XCircle className="mr-2 h-4 w-4" /> Deny Request
+                      </Button>
+                    </>
+                  )}
                 </div>
               ) : (
                 <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-center">

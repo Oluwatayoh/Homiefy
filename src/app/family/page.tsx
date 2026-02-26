@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
 import { doc, updateDoc, collection, query, where, getDocs, deleteField } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -42,6 +42,12 @@ export default function FamilyManagement() {
   const isAdmin = userData?.role === 'Admin';
   const isStaff = userData?.role === 'Admin' || userData?.role === 'Co-Manager';
 
+  // BR8.4.1: Family must have at least 1 Admin
+  const adminCount = useMemo(() => {
+    if (!familyData?.members) return 0;
+    return Object.values(familyData.members).filter(role => role === 'Admin').length;
+  }, [familyData]);
+
   const generateNewCode = async () => {
     if (!familyDocRef || !isAdmin) return;
     setIsUpdating(true);
@@ -64,6 +70,14 @@ export default function FamilyManagement() {
 
   const handleRoleChange = async (targetUserId: string, newRole: string) => {
     if (!familyDocRef || !isAdmin) return;
+    
+    // BR8.4.1: Last admin check
+    const currentRole = familyData.members[targetUserId];
+    if (currentRole === 'Admin' && newRole !== 'Admin' && adminCount <= 1) {
+      toast({ variant: "destructive", title: "Action Blocked", description: "BR8.4.1: You must have at least one Admin in the family." });
+      return;
+    }
+
     setIsUpdating(true);
     try {
       await updateDoc(familyDocRef, {
@@ -81,7 +95,15 @@ export default function FamilyManagement() {
   };
 
   const handleRemoveMember = async (targetUserId: string) => {
-    if (!familyDocRef || !isAdmin || targetUserId === user?.uid) return;
+    if (!familyDocRef || !isAdmin) return;
+    
+    // BR8.4.1: Last admin check
+    const currentRole = familyData.members[targetUserId];
+    if (currentRole === 'Admin' && adminCount <= 1) {
+      toast({ variant: "destructive", title: "Action Blocked", description: "BR8.4.1: Cannot remove the last Admin. Promote someone else first." });
+      return;
+    }
+
     if (!confirm("Are you sure you want to remove this member?")) return;
     
     setIsUpdating(true);
@@ -104,7 +126,7 @@ export default function FamilyManagement() {
   const handleThresholdChange = async (role: string, value: string) => {
     if (!familyDocRef || !isAdmin) return;
     const numericValue = parseFloat(value);
-    if (isNaN(numericValue)) return;
+    if (isNaN(numericValue) || numericValue < 0) return;
 
     setIsUpdating(true);
     try {
@@ -197,7 +219,7 @@ export default function FamilyManagement() {
                     onChange={(e) => handleThresholdChange('Member', e.target.value)}
                     className="h-10 font-bold"
                   />
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">Requires Approval Above</span>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">Above threshold requires approval</span>
                 </div>
               </div>
               <div className="space-y-1">
@@ -209,7 +231,7 @@ export default function FamilyManagement() {
                     onChange={(e) => handleThresholdChange('Co-Manager', e.target.value)}
                     className="h-10 font-bold"
                   />
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">Requires Approval Above</span>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">Above threshold requires approval</span>
                 </div>
               </div>
             </CardContent>
@@ -219,7 +241,10 @@ export default function FamilyManagement() {
 
       {/* Member Management */}
       <section className="space-y-3">
-        <h3 className="font-semibold px-1">Family Members</h3>
+        <div className="flex items-center justify-between px-1">
+          <h3 className="font-semibold">Family Members</h3>
+          <Badge variant="secondary" className="text-[10px]">{Object.keys(familyData.members).length}/10 MEMBERS</Badge>
+        </div>
         <div className="space-y-3">
           {Object.entries(familyData.members).map(([memberId, role]) => (
             <Card key={memberId} className="border-none shadow-sm overflow-hidden">
@@ -237,9 +262,13 @@ export default function FamilyManagement() {
                   </div>
                 </div>
 
-                {isAdmin && memberId !== user?.uid && (
+                {isAdmin && (
                   <div className="flex items-center gap-2">
-                    <Select value={role as string} onValueChange={(val) => handleRoleChange(memberId, val)}>
+                    <Select 
+                      value={role as string} 
+                      onValueChange={(val) => handleRoleChange(memberId, val)}
+                      disabled={memberId === user?.uid && adminCount <= 1} // BR8.4.1 safety
+                    >
                       <SelectTrigger className="h-8 w-28 text-[10px] font-bold">
                         <SelectValue />
                       </SelectTrigger>
@@ -249,14 +278,16 @@ export default function FamilyManagement() {
                         <SelectItem value="Member">Member</SelectItem>
                       </SelectContent>
                     </Select>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => handleRemoveMember(memberId)}
-                    >
-                      <UserMinus className="h-4 w-4" />
-                    </Button>
+                    {memberId !== user?.uid && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => handleRemoveMember(memberId)}
+                      >
+                        <UserMinus className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 )}
               </CardContent>

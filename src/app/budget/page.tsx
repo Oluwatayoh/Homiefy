@@ -50,6 +50,12 @@ export default function BudgetManagement() {
     return monthId === new Date().toISOString().slice(0, 7);
   }, [mounted, monthId]);
 
+  // BR8.1.3: Budget month cannot be future date
+  const isFutureMonth = useMemo(() => {
+    if (!mounted || !monthId) return false;
+    return monthId > new Date().toISOString().slice(0, 7);
+  }, [mounted, monthId]);
+
   const [income, setIncome] = useState<string>('');
   const [envelopes, setEnvelopes] = useState(DEFAULT_ENVELOPES.map(e => ({ ...e, spent: 0 })));
   const [isUpdating, setIsUpdating] = useState(false);
@@ -181,151 +187,176 @@ export default function BudgetManagement() {
             <Calendar className="h-3 w-3 text-primary" />
             {monthId}
           </div>
-          <Button variant="ghost" size="icon" onClick={() => navigateMonth(1)} className="h-8 w-8 rounded-lg">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => navigateMonth(1)} 
+            disabled={isCurrentMonth} // BR8.1.3: Cannot view/create future budgets
+            className="h-8 w-8 rounded-lg"
+          >
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
       </header>
 
-      <Card className="border-none shadow-xl bg-primary text-white overflow-hidden relative">
-        <div className="absolute top-0 right-0 p-4 opacity-10">
-          <PieChart className="w-32 h-32" />
+      {isFutureMonth ? (
+        <div className="p-8 text-center bg-white rounded-2xl border shadow-sm space-y-4">
+          <Calendar className="w-12 h-12 text-muted-foreground mx-auto" />
+          <h2 className="font-bold">Future Budget Restricted</h2>
+          <p className="text-sm text-muted-foreground">You cannot create or view budgets for future periods according to governance rules.</p>
+          <Button variant="outline" onClick={() => setCurrentDate(new Date())}>Return to Present</Button>
         </div>
-        <CardContent className="pt-6 space-y-4">
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold uppercase text-white/70 tracking-widest">Monthly Net Income</label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-xl">$</span>
-              <Input 
-                type="number" 
-                placeholder="0.00" 
-                value={income}
-                onChange={(e) => setIncome(e.target.value)}
-                disabled={!isAdmin || !isCurrentMonth}
-                className="pl-8 h-12 text-xl font-bold rounded-xl bg-white/10 border-none text-white placeholder:text-white/50"
-              />
+      ) : (
+        <>
+          <Card className="border-none shadow-xl bg-primary text-white overflow-hidden relative">
+            <div className="absolute top-0 right-0 p-4 opacity-10">
+              <PieChart className="w-32 h-32" />
             </div>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4 pt-2">
-            <div>
-              <p className="text-[10px] font-bold uppercase text-white/70">Total Spent</p>
-              <p className="text-lg font-bold">${totalSpent.toFixed(2)}</p>
+            <CardContent className="pt-6 space-y-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase text-white/70 tracking-widest">Monthly Net Income</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-xl">$</span>
+                  <Input 
+                    type="number" 
+                    placeholder="0.00" 
+                    value={income}
+                    onChange={(e) => setIncome(e.target.value)}
+                    disabled={!isAdmin || !isCurrentMonth}
+                    className="pl-8 h-12 text-xl font-bold rounded-xl bg-white/10 border-none text-white placeholder:text-white/50"
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 pt-2">
+                <div>
+                  <p className="text-[10px] font-bold uppercase text-white/70">Total Spent</p>
+                  <p className="text-lg font-bold">${totalSpent.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase text-white/70">Remaining</p>
+                  <p className={cn("text-lg font-bold", remainingIncome < 0 ? "text-red-300" : "text-white")}>
+                    ${remainingIncome.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+              
+              {isAdmin && isCurrentMonth && (
+                <Button variant="secondary" size="sm" onClick={apply503020} className="w-full rounded-lg font-bold gap-2">
+                  <Wand2 className="h-4 w-4" /> Suggest 50/30/20 Split
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+
+          {isCurrentMonth && remainingIncome < 0 && (
+            <div className="p-3 rounded-lg bg-red-100 border border-red-200 flex items-center gap-2 text-red-600 text-xs font-bold animate-pulse">
+              <AlertTriangle className="h-4 w-4" />
+              ALLOCATIONS EXCEED INCOME!
             </div>
-            <div>
-              <p className="text-[10px] font-bold uppercase text-white/70">Remaining</p>
-              <p className={cn("text-lg font-bold", remainingIncome < 0 ? "text-red-300" : "text-white")}>
-                ${remainingIncome.toFixed(2)}
-              </p>
-            </div>
-          </div>
-          
-          {isAdmin && isCurrentMonth && (
-            <Button variant="secondary" size="sm" onClick={apply503020} className="w-full rounded-lg font-bold gap-2">
-              <Wand2 className="h-4 w-4" /> Suggest 50/30/20 Split
-            </Button>
           )}
-        </CardContent>
-      </Card>
 
-      {isCurrentMonth && remainingIncome < 0 && (
-        <div className="p-3 rounded-lg bg-red-100 border border-red-200 flex items-center gap-2 text-red-600 text-xs font-bold animate-pulse">
-          <AlertTriangle className="h-4 w-4" />
-          ALLOCATIONS EXCEED INCOME!
-        </div>
-      )}
+          {/* BR8.1.4: Total envelope allocation should equal monthly income (warning if not) */}
+          {isCurrentMonth && remainingIncome > 0 && parseFloat(income) > 0 && (
+            <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 flex items-center gap-2 text-amber-700 text-xs font-bold">
+              <Info className="h-4 w-4" />
+              UNALLOCATED FUNDS: ${remainingIncome.toFixed(2)}
+            </div>
+          )}
 
-      <section className="space-y-4">
-        <div className="flex items-center justify-between px-1">
-          <h3 className="font-semibold">Categories</h3>
-          <Badge variant="outline" className="text-[10px] font-bold">{envelopes.length} ACTIVE</Badge>
-        </div>
+          <section className="space-y-4">
+            <div className="flex items-center justify-between px-1">
+              <h3 className="font-semibold">Categories</h3>
+              <Badge variant="outline" className="text-[10px] font-bold">{envelopes.length} ACTIVE</Badge>
+            </div>
 
-        <div className="space-y-3">
-          {envelopes.map((env) => {
-            const percent = env.allocated > 0 ? (env.spent / env.allocated) * 100 : 0;
-            const isWarning = percent >= 80 && percent < 100;
-            const isOver = percent >= 100;
-            
-            return (
-              <Card key={env.id} className="border-none shadow-sm overflow-hidden bg-white group">
-                <CardContent className="p-4 space-y-3">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3 flex-1">
-                      <div className={cn(
-                        "w-10 h-10 rounded-xl flex items-center justify-center transition-colors",
-                        isOver ? "bg-red-100 text-red-600" : isWarning ? "bg-amber-100 text-amber-600" : "bg-secondary text-primary"
-                      )}>
-                        <PieChart className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold">{env.name}</h4>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">
-                            ${env.spent.toFixed(0)} spent
-                          </span>
-                          <span className="text-[10px] text-muted-foreground/30">•</span>
-                          <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">
-                            ${(env.allocated - env.spent).toFixed(0)} left
-                          </span>
+            <div className="space-y-3">
+              {envelopes.map((env) => {
+                const percent = env.allocated > 0 ? (env.spent / env.allocated) * 100 : 0;
+                const isWarning = percent >= 80 && percent < 100;
+                const isOver = percent >= 100;
+                
+                return (
+                  <Card key={env.id} className="border-none shadow-sm overflow-hidden bg-white group">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3 flex-1">
+                          <div className={cn(
+                            "w-10 h-10 rounded-xl flex items-center justify-center transition-colors",
+                            isOver ? "bg-red-100 text-red-600" : isWarning ? "bg-amber-100 text-amber-600" : "bg-secondary text-primary"
+                          )}>
+                            <PieChart className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-bold">{env.name}</h4>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">
+                                ${env.spent.toFixed(0)} spent
+                              </span>
+                              <span className="text-[10px] text-muted-foreground/30">•</span>
+                              <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">
+                                ${(env.allocated - env.spent).toFixed(0)} left
+                              </span>
+                            </div>
+                          </div>
                         </div>
+                        {isAdmin && isCurrentMonth ? (
+                          <div className="w-24">
+                            <Input 
+                              type="number" 
+                              value={env.allocated || ''} 
+                              onChange={(e) => handleUpdateEnvelope(env.id, e.target.value)}
+                              className="h-10 font-bold text-right pr-3 rounded-lg border-primary/10"
+                              placeholder="0"
+                            />
+                          </div>
+                        ) : (
+                          <div className="text-right">
+                            <p className="text-sm font-bold">${env.allocated.toFixed(0)}</p>
+                            <p className="text-[10px] text-muted-foreground font-bold uppercase">Budget</p>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                    {isAdmin && isCurrentMonth ? (
-                      <div className="w-24">
-                        <Input 
-                          type="number" 
-                          value={env.allocated || ''} 
-                          onChange={(e) => handleUpdateEnvelope(env.id, e.target.value)}
-                          className="h-10 font-bold text-right pr-3 rounded-lg border-primary/10"
-                          placeholder="0"
+                      
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center text-[10px] font-bold uppercase text-muted-foreground">
+                          <span>{percent.toFixed(0)}%</span>
+                          {isOver && <span className="text-red-500">Alert: Over Budget</span>}
+                          {isWarning && <span className="text-amber-500">Approaching Limit</span>}
+                        </div>
+                        <Progress 
+                          value={Math.min(percent, 100)} 
+                          className={cn(
+                            "h-1.5 bg-secondary",
+                            isOver ? "[&>div]:bg-red-500" : isWarning ? "[&>div]:bg-amber-500" : ""
+                          )} 
                         />
                       </div>
-                    ) : (
-                      <div className="text-right">
-                        <p className="text-sm font-bold">${env.allocated.toFixed(0)}</p>
-                        <p className="text-[10px] text-muted-foreground font-bold uppercase">Budget</p>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <div className="flex justify-between items-center text-[10px] font-bold uppercase text-muted-foreground">
-                      <span>{percent.toFixed(0)}%</span>
-                      {isOver && <span className="text-red-500">Alert: Over Budget</span>}
-                      {isWarning && <span className="text-amber-500">Approaching Limit</span>}
-                    </div>
-                    <Progress 
-                      value={Math.min(percent, 100)} 
-                      className={cn(
-                        "h-1.5 bg-secondary",
-                        isOver ? "[&>div]:bg-red-500" : isWarning ? "[&>div]:bg-amber-500" : ""
-                      )} 
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      </section>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </section>
 
-      {isAdmin && isCurrentMonth && (
-        <Button 
-          className="w-full h-14 rounded-xl text-lg font-bold shadow-xl mt-4"
-          onClick={handleSaveBudget}
-          disabled={isUpdating || remainingIncome < 0}
-        >
-          {isUpdating ? <Loader2 className="animate-spin mr-2" /> : <CheckCircle2 className="mr-2 h-5 w-5" />}
-          Update Budget
-        </Button>
-      )}
+          {isAdmin && isCurrentMonth && (
+            <Button 
+              className="w-full h-14 rounded-xl text-lg font-bold shadow-xl mt-4"
+              onClick={handleSaveBudget}
+              disabled={isUpdating || remainingIncome < 0 || parseFloat(income) <= 0}
+            >
+              {isUpdating ? <Loader2 className="animate-spin mr-2" /> : <CheckCircle2 className="mr-2 h-5 w-5" />}
+              Update Budget
+            </Button>
+          )}
 
-      {!isCurrentMonth && mounted && (
-        <div className="p-4 rounded-xl bg-secondary/30 flex items-center gap-3 text-sm text-muted-foreground">
-          <Info className="h-5 w-5 text-primary" />
-          You are viewing a historical budget. It cannot be modified.
-        </div>
+          {!isCurrentMonth && mounted && !isFutureMonth && (
+            <div className="p-4 rounded-xl bg-secondary/30 flex items-center gap-3 text-sm text-muted-foreground">
+              <Info className="h-5 w-5 text-primary" />
+              You are viewing a historical budget. It cannot be modified.
+            </div>
+          )}
+        </>
       )}
     </div>
   );

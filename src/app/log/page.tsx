@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from 'react';
@@ -14,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Loader2, Plus, Smile, Meh, Frown, Sparkles, Brain, Camera, X, ShieldAlert } from 'lucide-react';
+import { Loader2, Plus, Smile, Meh, Frown, Sparkles, Brain, Camera, X, ShieldAlert, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -33,6 +32,7 @@ export default function RapidLog() {
   const [desc, setDesc] = useState('');
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('');
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [sentiment, setSentiment] = useState<'happy' | 'neutral' | 'unhappy' | null>(null);
   const [loading, setLoading] = useState(false);
   const [impulseResult, setImpulseResult] = useState<ImpulseSpendingDetectionOutput | null>(null);
@@ -82,6 +82,17 @@ export default function RapidLog() {
     return !isNaN(val) && val > threshold;
   }, [amount, threshold]);
 
+  // BR8.2.2: Transaction date cannot be future
+  const isFutureDate = useMemo(() => {
+    return new Date(date) > new Date();
+  }, [date]);
+
+  // BR8.2.1: Transaction amount must be > 0
+  const isAmountValid = useMemo(() => {
+    const val = parseFloat(amount);
+    return !isNaN(val) && val > 0;
+  }, [amount]);
+
   useEffect(() => {
     if (showCamera) {
       const getCameraPermission = async () => {
@@ -122,7 +133,10 @@ export default function RapidLog() {
   };
 
   async function handleLogOrRequest() {
-    if (!desc || !amount || !category || !userData?.familyId) return;
+    if (!desc || !isAmountValid || !category || !userData?.familyId || isFutureDate) {
+      toast({ variant: "destructive", title: "Validation Error", description: "Please ensure amount > 0 and date is not in the future." });
+      return;
+    }
     
     if (isOverThreshold) {
       setShowApprovalModal(true);
@@ -134,17 +148,6 @@ export default function RapidLog() {
     const familyId = userData.familyId;
 
     try {
-      // Detection only if user opted in or by default? FRD says "AI decision engine" is a feature.
-      const result = await impulseSpendingDetection({
-        transactionDetails: desc,
-        amount: numericAmount,
-        category,
-        timestamp: new Date().toISOString(),
-        previousSpendingPatterns: "Frequent dining and shopping entries.",
-        familyGoals: [],
-      });
-      setImpulseResult(result);
-
       const transactionsRef = collection(db, 'families', familyId, 'transactions');
       const transactionData = {
         familyId,
@@ -155,7 +158,7 @@ export default function RapidLog() {
         description: desc,
         receiptPhoto: receiptPhoto || null,
         sentiment: sentiment || 'neutral',
-        date: new Date().toISOString(),
+        date: new Date(date).toISOString(),
         createdAt: new Date().toISOString()
       };
 
@@ -201,7 +204,7 @@ export default function RapidLog() {
           description: desc,
           receiptPhoto: receiptPhoto || null,
           sentiment: sentiment || 'neutral',
-          date: new Date().toISOString()
+          date: new Date(date).toISOString()
         }
       };
 
@@ -239,7 +242,7 @@ export default function RapidLog() {
               <Input 
                 type="number" 
                 placeholder="0.00" 
-                className="pl-8 h-14 text-xl font-bold rounded-xl"
+                className={cn("pl-8 h-14 text-xl font-bold rounded-xl", !isAmountValid && amount !== '' && "border-red-500")}
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
               />
@@ -268,6 +271,17 @@ export default function RapidLog() {
             value={desc}
             onChange={(e) => setDesc(e.target.value)}
           />
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Date</label>
+          <Input 
+            type="date" 
+            className={cn("h-12 rounded-xl", isFutureDate && "border-red-500")}
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+          />
+          {isFutureDate && <p className="text-[9px] text-red-500 font-bold">BR8.2.2: DATE CANNOT BE IN THE FUTURE</p>}
         </div>
 
         <div className="space-y-2">
@@ -330,7 +344,7 @@ export default function RapidLog() {
             isOverThreshold ? "bg-amber-600 hover:bg-amber-700" : ""
           )}
           onClick={handleLogOrRequest}
-          disabled={loading || !desc || !amount || !category}
+          disabled={loading || !desc || !isAmountValid || !category || isFutureDate}
         >
           {loading ? <Loader2 className="animate-spin mr-2" /> : isOverThreshold ? <ShieldAlert className="mr-2 h-5 w-5" /> : <Plus className="mr-2 h-5 w-5" />}
           {isOverThreshold ? "Request Approval" : "Log Transaction"}
