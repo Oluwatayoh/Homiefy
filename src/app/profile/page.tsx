@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -14,6 +13,7 @@ import { LogOut, User as UserIcon, Settings, Bell, Shield, ChevronRight, Loader2
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 export default function ProfilePage() {
   const { user, isUserLoading } = useUser();
@@ -172,9 +172,17 @@ export default function ProfilePage() {
                     value={editPhone} 
                     onChange={(e) => setEditPhone(e.target.value)}
                     placeholder="e.g. +234 800 000 0000"
-                    className="rounded-xl h-11 bg-white"
+                    className={cn(
+                      "rounded-xl h-11 transition-colors",
+                      userData?.phoneNumber ? "bg-muted/30 text-muted-foreground" : "bg-white"
+                    )}
+                    disabled={!!userData?.phoneNumber}
                   />
-                  {!editPhone && <p className="text-[9px] text-amber-600 font-bold italic">Missing: Please add your mobile number.</p>}
+                  {userData?.phoneNumber ? (
+                    <p className="text-[9px] text-muted-foreground font-bold italic">Mobile number is locked once set.</p>
+                  ) : (
+                    !editPhone && <p className="text-[9px] text-amber-600 font-bold italic">Missing: Please add your mobile number.</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
