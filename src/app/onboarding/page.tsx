@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -61,7 +62,7 @@ export default function OnboardingPage() {
       };
 
       await setDoc(familyRef, familyData);
-      await updateDoc(doc(db, 'users', user.uid), {
+      await updateDoc(doc(db, 'userProfiles', user.uid), {
         familyId: familyId,
         role: 'Admin'
       });
@@ -91,18 +92,18 @@ export default function OnboardingPage() {
       const familyData = familyDoc.data();
       
       if (new Date(familyData.inviteCodeExpires) < new Date()) {
-        throw new Error("BR8.4.3: This invite code has expired. Request a new one from your admin.");
+        throw new Error("BR8.4.3: This invite code has expired.");
       }
 
       if (Object.keys(familyData.members || {}).length >= 10) {
-        throw new Error("BR8.4.5: This family has reached the maximum capacity of 10 members.");
+        throw new Error("BR8.4.5: Maximum family capacity reached.");
       }
 
       await updateDoc(familyDoc.ref, {
         [`members.${user.uid}`]: 'Member'
       });
 
-      await updateDoc(doc(db, 'users', user.uid), {
+      await updateDoc(doc(db, 'userProfiles', user.uid), {
         familyId: familyDoc.id,
         role: 'Member'
       });
@@ -117,49 +118,36 @@ export default function OnboardingPage() {
   };
 
   if (isUserLoading || (user && loading)) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
+    return <div className="flex items-center justify-center min-h-screen"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
   }
 
   return (
     <div className="p-6 flex flex-col gap-6 min-h-screen justify-center">
       <div className="mb-8 text-center">
         <h1 className="text-3xl font-bold font-headline text-primary">Setup Your Home</h1>
-        <p className="text-muted-foreground mt-2">Every great financial journey starts with a plan.</p>
+        <p className="text-muted-foreground mt-2">Connect your family and start managing wealth.</p>
       </div>
 
       {mode === 'selection' && (
         <div className="grid gap-4">
-          <Card 
-            className="cursor-pointer hover:border-primary transition-all shadow-md group"
-            onClick={() => setMode('create')}
-          >
+          <Card className="cursor-pointer hover:border-primary transition-all shadow-md group" onClick={() => setMode('create')}>
             <CardContent className="p-6 flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-colors">
                 <Users className="w-6 h-6" />
               </div>
-              <div className="flex-1 text-left">
-                <h3 className="font-bold">Create a New Family</h3>
-                <p className="text-xs text-muted-foreground">Start fresh and invite your household.</p>
+              <div className="flex-1">
+                <h3 className="font-bold text-left">Create a New Family</h3>
               </div>
               <ArrowRight className="text-muted-foreground w-4 h-4" />
             </CardContent>
           </Card>
-
-          <Card 
-            className="cursor-pointer hover:border-accent transition-all shadow-md group"
-            onClick={() => setMode('join')}
-          >
+          <Card className="cursor-pointer hover:border-accent transition-all shadow-md group" onClick={() => setMode('join')}>
             <CardContent className="p-6 flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center text-accent group-hover:bg-accent group-hover:text-white transition-colors">
                 <UserPlus className="w-6 h-6" />
               </div>
-              <div className="flex-1 text-left">
-                <h3 className="font-bold">Join Existing Family</h3>
-                <p className="text-xs text-muted-foreground">Enter a code from an existing admin.</p>
+              <div className="flex-1">
+                <h3 className="font-bold text-left">Join Existing Family</h3>
               </div>
               <ArrowRight className="text-muted-foreground w-4 h-4" />
             </CardContent>
@@ -169,37 +157,15 @@ export default function OnboardingPage() {
 
       {mode === 'create' && (
         <Card className="border-none shadow-xl">
-          <CardHeader>
-            <CardTitle>Family Details</CardTitle>
-            <CardDescription>Give your financial unit a name.</CardDescription>
-          </CardHeader>
+          <CardHeader><CardTitle>Family Details</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-semibold">Family Name</label>
-              <Input 
-                placeholder="The Smiths" 
-                value={familyName}
-                onChange={(e) => setFamilyName(e.target.value)}
-                maxLength={50}
-              />
+              <Label>Family Name</Label>
+              <Input placeholder="The Smiths" value={familyName} onChange={(e) => setFamilyName(e.target.value)} />
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-semibold">Base Currency</label>
-              <Select value={currency} onValueChange={setCurrency}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="USD">USD ($)</SelectItem>
-                  <SelectItem value="EUR">EUR (€)</SelectItem>
-                  <SelectItem value="GBP">GBP (£)</SelectItem>
-                  <SelectItem value="NGN">NGN (₦)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex gap-3 pt-2">
+            <div className="flex gap-3">
               <Button variant="outline" className="flex-1" onClick={() => setMode('selection')}>Back</Button>
-              <Button className="flex-1" onClick={handleCreateFamily} disabled={!familyName || familyName.length < 3}>Create</Button>
+              <Button className="flex-1" onClick={handleCreateFamily} disabled={!familyName}>Create</Button>
             </div>
           </CardContent>
         </Card>
@@ -207,19 +173,10 @@ export default function OnboardingPage() {
 
       {mode === 'join' && (
         <Card className="border-none shadow-xl">
-          <CardHeader>
-            <CardTitle>Enter Invite Code</CardTitle>
-            <CardDescription>Check with your family admin for the 6-digit code.</CardDescription>
-          </CardHeader>
+          <CardHeader><CardTitle>Invite Code</CardTitle></CardHeader>
           <CardContent className="space-y-4">
-            <Input 
-              placeholder="e.g. 123456" 
-              className="text-center text-2xl font-bold tracking-widest h-14"
-              value={inviteCode}
-              onChange={(e) => setInviteCode(e.target.value)}
-              maxLength={6}
-            />
-            <div className="flex gap-3 pt-2">
+            <Input placeholder="Enter 6-digit code" className="text-center font-bold" value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} />
+            <div className="flex gap-3">
               <Button variant="outline" className="flex-1" onClick={() => setMode('selection')}>Back</Button>
               <Button className="flex-1" onClick={handleJoinFamily} disabled={inviteCode.length < 6}>Join</Button>
             </div>

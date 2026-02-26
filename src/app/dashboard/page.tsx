@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -37,7 +38,7 @@ export default function Dashboard() {
   }, []);
 
   const userDocRef = useMemoFirebase(() => {
-    return user ? doc(db, 'users', user.uid) : null;
+    return user ? doc(db, 'userProfiles', user.uid) : null;
   }, [user, db]);
 
   const { data: userData, isLoading: isUserDataLoading } = useDoc(userDocRef);
@@ -189,7 +190,6 @@ export default function Dashboard() {
   const handleDecision = async (status: 'Approved' | 'Denied') => {
     if (!selectedApproval || !userData?.familyId || !user) return;
     
-    // BR8.3.2: User cannot approve own request
     if (selectedApproval.requesterId === user.uid) {
       toast({ variant: "destructive", title: "Rule Violation", description: "BR8.3.2: You cannot approve your own spending request." });
       return;
@@ -254,7 +254,7 @@ export default function Dashboard() {
           ) : (
             <Avatar className="border-2 border-background w-8 h-8 cursor-pointer" onClick={() => router.push('/profile')}>
               <AvatarFallback className="text-[10px] bg-secondary text-primary font-bold">
-                {user?.displayName?.[0] || 'U'}
+                {userData?.firstName?.[0] || user?.displayName?.[0] || 'U'}
               </AvatarFallback>
             </Avatar>
           )}

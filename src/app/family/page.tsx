@@ -1,15 +1,16 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
-import { doc, updateDoc, collection, query, where, getDocs, deleteField } from 'firebase/firestore';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { doc, updateDoc, deleteField } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, UserMinus, Shield, ShieldCheck, Mail, Copy, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Loader2, UserMinus, Shield, ShieldCheck, Copy, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 
@@ -20,7 +21,7 @@ export default function FamilyManagement() {
   const router = useRouter();
 
   const userDocRef = useMemoFirebase(() => {
-    return user ? doc(db, 'users', user.uid) : null;
+    return user ? doc(db, 'userProfiles', user.uid) : null;
   }, [user, db]);
 
   const { data: userData, isLoading: isUserDataLoading } = useDoc(userDocRef);
@@ -40,9 +41,7 @@ export default function FamilyManagement() {
   }, [user, isUserLoading, router]);
 
   const isAdmin = userData?.role === 'Admin';
-  const isStaff = userData?.role === 'Admin' || userData?.role === 'Co-Manager';
 
-  // BR8.4.1: Family must have at least 1 Admin
   const adminCount = useMemo(() => {
     if (!familyData?.members) return 0;
     return Object.values(familyData.members).filter(role => role === 'Admin').length;
@@ -71,7 +70,6 @@ export default function FamilyManagement() {
   const handleRoleChange = async (targetUserId: string, newRole: string) => {
     if (!familyDocRef || !isAdmin) return;
     
-    // BR8.4.1: Last admin check
     const currentRole = familyData.members[targetUserId];
     if (currentRole === 'Admin' && newRole !== 'Admin' && adminCount <= 1) {
       toast({ variant: "destructive", title: "Action Blocked", description: "BR8.4.1: You must have at least one Admin in the family." });
@@ -83,7 +81,7 @@ export default function FamilyManagement() {
       await updateDoc(familyDocRef, {
         [`members.${targetUserId}`]: newRole
       });
-      await updateDoc(doc(db, 'users', targetUserId), {
+      await updateDoc(doc(db, 'userProfiles', targetUserId), {
         role: newRole
       });
       toast({ title: "Role Updated", description: "The member's permissions have been changed." });
@@ -97,7 +95,6 @@ export default function FamilyManagement() {
   const handleRemoveMember = async (targetUserId: string) => {
     if (!familyDocRef || !isAdmin) return;
     
-    // BR8.4.1: Last admin check
     const currentRole = familyData.members[targetUserId];
     if (currentRole === 'Admin' && adminCount <= 1) {
       toast({ variant: "destructive", title: "Action Blocked", description: "BR8.4.1: Cannot remove the last Admin. Promote someone else first." });
@@ -111,30 +108,13 @@ export default function FamilyManagement() {
       await updateDoc(familyDocRef, {
         [`members.${targetUserId}`]: deleteField()
       });
-      await updateDoc(doc(db, 'users', targetUserId), {
+      await updateDoc(doc(db, 'userProfiles', targetUserId), {
         familyId: deleteField(),
         role: deleteField()
       });
       toast({ title: "Member Removed", description: "They no longer have access to family data." });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Removal Failed", description: e.message });
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
-  const handleThresholdChange = async (role: string, value: string) => {
-    if (!familyDocRef || !isAdmin) return;
-    const numericValue = parseFloat(value);
-    if (isNaN(numericValue) || numericValue < 0) return;
-
-    setIsUpdating(true);
-    try {
-      await updateDoc(familyDocRef, {
-        [`approvalThresholds.${role}`]: numericValue
-      });
-    } catch (e: any) {
-      toast({ variant: "destructive", title: "Threshold Update Failed", description: e.message });
     } finally {
       setIsUpdating(false);
     }
@@ -166,7 +146,6 @@ export default function FamilyManagement() {
         <p className="text-muted-foreground text-sm">Family Governance & Settings</p>
       </header>
 
-      {/* Invite Code Section - Only for Admins */}
       {isAdmin && (
         <Card className="border-none shadow-xl bg-accent text-white overflow-hidden">
           <CardHeader className="pb-2">
@@ -192,54 +171,12 @@ export default function FamilyManagement() {
             </div>
             <div className="flex justify-between items-center text-xs">
               <span className="text-white/70">Expires: {new Date(familyData.inviteCodeExpires).toLocaleDateString()}</span>
-              <button 
-                className="font-bold underline text-white" 
-                onClick={generateNewCode}
-                disabled={isUpdating}
-              >
-                Refresh Code
-              </button>
+              <button className="font-bold underline text-white" onClick={generateNewCode} disabled={isUpdating}>Refresh Code</button>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Threshold Configuration - Only for Admins */}
-      {isAdmin && (
-        <section className="space-y-3">
-          <h3 className="font-semibold px-1">Approval Thresholds</h3>
-          <Card className="border-none shadow-sm">
-            <CardContent className="p-4 space-y-4">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase text-muted-foreground">Member Limit</label>
-                <div className="flex items-center gap-3">
-                  <Input 
-                    type="number" 
-                    value={familyData.approvalThresholds?.Member} 
-                    onChange={(e) => handleThresholdChange('Member', e.target.value)}
-                    className="h-10 font-bold"
-                  />
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">Above threshold requires approval</span>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase text-muted-foreground">Co-Manager Limit</label>
-                <div className="flex items-center gap-3">
-                  <Input 
-                    type="number" 
-                    value={familyData.approvalThresholds?.['Co-Manager']} 
-                    onChange={(e) => handleThresholdChange('Co-Manager', e.target.value)}
-                    className="h-10 font-bold"
-                  />
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">Above threshold requires approval</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </section>
-      )}
-
-      {/* Member Management */}
       <section className="space-y-3">
         <div className="flex items-center justify-between px-1">
           <h3 className="font-semibold">Family Members</h3>
@@ -267,7 +204,7 @@ export default function FamilyManagement() {
                     <Select 
                       value={role as string} 
                       onValueChange={(val) => handleRoleChange(memberId, val)}
-                      disabled={memberId === user?.uid && adminCount <= 1} // BR8.4.1 safety
+                      disabled={memberId === user?.uid && adminCount <= 1}
                     >
                       <SelectTrigger className="h-8 w-28 text-[10px] font-bold">
                         <SelectValue />
@@ -295,12 +232,6 @@ export default function FamilyManagement() {
           ))}
         </div>
       </section>
-
-      {isUpdating && (
-        <div className="fixed inset-0 bg-background/50 backdrop-blur-sm flex items-center justify-center z-[100]">
-          <Loader2 className="w-10 h-10 animate-spin text-primary" />
-        </div>
-      )}
     </div>
   );
 }

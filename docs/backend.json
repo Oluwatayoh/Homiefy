@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "UserProfile": {
@@ -109,6 +110,7 @@
   "auth": {
     "providers": [
       "password",
+      "google.com",
       "anonymous"
     ]
   },
@@ -145,68 +147,7 @@
             }
           ]
         }
-      },
-      {
-        "path": "/families/{familyId}/budgets/{budgetId}",
-        "definition": {
-          "entityName": "Budget",
-          "schema": {
-            "$ref": "#/backend/entities/Budget"
-          },
-          "description": "Stores individual budget configurations within a specific family. This document includes a denormalized 'members' map copied from its parent Family document for authorization independence.",
-          "params": [
-            {
-              "name": "familyId",
-              "description": "The unique ID of the parent family."
-            },
-            {
-              "name": "budgetId",
-              "description": "The unique ID for a specific budget within the family."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/families/{familyId}/goals/{goalId}",
-        "definition": {
-          "entityName": "Goal",
-          "schema": {
-            "$ref": "#/backend/entities/Goal"
-          },
-          "description": "Stores shared financial goals for a specific family. This document includes a denormalized 'members' map copied from its parent Family document for authorization independence.",
-          "params": [
-            {
-              "name": "familyId",
-              "description": "The unique ID of the parent family."
-            },
-            {
-              "name": "goalId",
-              "description": "The unique ID for a specific financial goal within the family."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/families/{familyId}/transactions/{transactionId}",
-        "definition": {
-          "entityName": "Transaction",
-          "schema": {
-            "$ref": "#/backend/entities/Transaction"
-          },
-          "description": "Stores individual financial transactions and spending accountability logs for a specific family. This document includes a denormalized 'members' map copied from its parent Family document for authorization independence.",
-          "params": [
-            {
-              "name": "familyId",
-              "description": "The unique ID of the parent family."
-            },
-            {
-              "name": "transactionId",
-              "description": "The unique ID for a specific transaction within the family."
-            }
-          ]
-        }
       }
-    ],
-    "reasoning": "The recommended Firestore structure for KINETY prioritizes secure, scalable, and debuggable authorization by strictly adhering to the core design principles. The structure is built around two primary top-level collections: `/userProfiles` for individual user data and `/families` for collaborative family-specific data.\n\n**Authorization Independence (CRITICAL):**\nTo eliminate the need for `get()` calls in security rules, which break atomic operations and complicate debugging, we implement a robust denormalization strategy:\n1.  **Family Membership Denormalization:** The `Family` entity schema, as provided, includes an `adminUserId` but lacks a comprehensive membership structure for authorization. Therefore, it is **CRITICAL** that the `Family` entity (at `/families/{familyId}`) be extended to include a `members` map. This map will store the `userId` as a key and their `role` (e.g., 'Admin', 'Parent', 'Child') within that specific family as the value (e.g., `members: { \"uid1\": \"Admin\", \"uid2\": \"Parent\" }`). This `members` map serves as the single source of truth for who belongs to a family and their respective permissions, allowing security rules to check `resource.data.members[request.auth.uid]` directly.\n2.  **Subcollection Document Denormalization:** Following the Authorization Independence mandate, any document within a family's subcollection (e.g., `/families/{familyId}/budgets/{budgetId}`, `/families/{familyId}/goals/{goalId}`, `/families/{familyId}/transactions/{transactionId}`) **MUST** also denormalize the `members` map from its parent `Family` document. This means that when a `Budget` document (for example) is created or updated, its `members` field will be a copy of the parent `Family`'s `members` field. This ensures that any security rule applied to a subcollection document can determine the user's authorization context solely by inspecting that document (`resource.data.members[request.auth.uid]`) without any cross-document reads.\n\n**Queryable Authorization Patterns (QAPs):**\nThis structure directly supports QAPs for secure `list` operations:\n1.  **Listing Families:** A user can securely query the `/families` collection by filtering on their membership: `db.collection('families').where('members.' + auth.uid, '!=', null)`. This leverages the denormalized `members` map on the `Family` documents themselves, ensuring that only families the user belongs to are returned, without the need for client-side filtering or inefficient security rules acting as filters.\n2.  **Listing Family Subcollections:** For subcollections (e.g., budgets within a specific family), the path `(/families/{familyId}/budgets)` inherently scopes the query to a family the user has already identified they are a member of. The denormalized `members` map on each `budgets` document then provides atomic authorization checks for reading, writing, or updating individual budget items within that family context.\n\n**Structural Segregation & Access Modeling:**\n*   **Private Data:** `/userProfiles/{userId}` provides a path-based ownership model where only the authenticated user (`request.auth.uid`) can access their own profile data, ensuring clear segregation of private information.\n*   **Collaborative Data:** `/families/{familyId}` and its subcollections represent collaborative data. Access to these resources is controlled by the denormalized `members` map, standardizing collaborative access patterns. All documents within a given family's domain (`/families/{familyId}/...`) share the same fundamental security posture (accessible by family members, possibly with role-based variations).\n\n**DBAC:** Roles (`Admin`, `Parent`, `Child`) are stored directly within the database (`members` map) rather than relying on custom claims, simplifying rule logic to `request.auth.uid` and document data.\n\n**Invariants:** The structure supports ownership (`request.auth.uid` for `UserProfile`, `members` for `Family` and subcollections) and timestamps (`createdAt`, `updatedAt`) through direct fields on the entities.\n\nThis design ensures that security rules will be simple, explicit, and highly performant, as they will primarily rely on `request.auth.uid` matching path parameters or inspecting fields directly on the `resource.data` of the document being accessed, thereby avoiding complex and costly `get()` operations."
+    ]
   }
 }

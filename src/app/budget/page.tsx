@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -50,7 +51,6 @@ export default function BudgetManagement() {
     return monthId === new Date().toISOString().slice(0, 7);
   }, [mounted, monthId]);
 
-  // BR8.1.3: Budget month cannot be future date
   const isFutureMonth = useMemo(() => {
     if (!mounted || !monthId) return false;
     return monthId > new Date().toISOString().slice(0, 7);
@@ -61,7 +61,7 @@ export default function BudgetManagement() {
   const [isUpdating, setIsUpdating] = useState(false);
 
   const userDocRef = useMemoFirebase(() => {
-    return user ? doc(db, 'users', user.uid) : null;
+    return user ? doc(db, 'userProfiles', user.uid) : null;
   }, [user, db]);
 
   const { data: userData } = useDoc(userDocRef);
@@ -191,7 +191,7 @@ export default function BudgetManagement() {
             variant="ghost" 
             size="icon" 
             onClick={() => navigateMonth(1)} 
-            disabled={isCurrentMonth} // BR8.1.3: Cannot view/create future budgets
+            disabled={isCurrentMonth}
             className="h-8 w-8 rounded-lg"
           >
             <ChevronRight className="h-4 w-4" />
@@ -256,7 +256,6 @@ export default function BudgetManagement() {
             </div>
           )}
 
-          {/* BR8.1.4: Total envelope allocation should equal monthly income (warning if not) */}
           {isCurrentMonth && remainingIncome > 0 && parseFloat(income) > 0 && (
             <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 flex items-center gap-2 text-amber-700 text-xs font-bold">
               <Info className="h-4 w-4" />
