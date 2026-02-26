@@ -33,24 +33,24 @@
 
   @media (prefers-color-scheme: dark) {
     :root {
-      --background: 224 71% 4%;
-      --foreground: 213 31% 91%;
-      --card: 224 71% 7%;
-      --card-foreground: 213 31% 91%;
-      --popover: 224 71% 4%;
-      --popover-foreground: 215 20.2% 65.1%;
-      --primary: 214 60% 55%; /* Keeping it blue in dark mode */
+      --background: 222 47% 4%;
+      --foreground: 210 40% 98%;
+      --card: 222 47% 7%;
+      --card-foreground: 210 40% 98%;
+      --popover: 222 47% 4%;
+      --popover-foreground: 215 20% 65%;
+      --primary: 214 60% 55%;
       --primary-foreground: 0 0% 100%;
-      --secondary: 222.2 47.4% 11.2%;
+      --secondary: 217 32% 12%;
       --secondary-foreground: 210 40% 98%;
-      --muted: 223 47% 11%;
-      --muted-foreground: 215.4 16.3% 56.9%;
+      --muted: 217 32% 12%;
+      --muted-foreground: 215 20% 65%;
       --accent: 268 78% 55%;
       --accent-foreground: 0 0% 100%;
-      --destructive: 0 63% 31%;
+      --destructive: 0 62% 30%;
       --destructive-foreground: 210 40% 98%;
-      --border: 216 34% 17%;
-      --input: 216 34% 17%;
+      --border: 217 32% 17%;
+      --input: 217 32% 17%;
       --ring: 214 60% 55%;
       --chart-1: 214 60% 55%;
       --chart-2: 160 60% 45%;

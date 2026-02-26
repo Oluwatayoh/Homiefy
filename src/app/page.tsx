@@ -32,7 +32,6 @@ export default function LandingPage() {
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showSignupPassword, setShowSignupPassword] = useState(false);
 
-  // Validation States
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   useEffect(() => {
@@ -127,10 +126,10 @@ export default function LandingPage() {
     if (!firstName) newErrors.firstName = "First name is required";
     if (!lastName) newErrors.lastName = "Last name is required";
     if (!validateEmail(email)) newErrors.email = "Invalid email address";
-    if (!validatePhone(phoneNumber)) newErrors.phone = "Invalid format (e.g., +1234567890)";
+    if (!validatePhone(phoneNumber)) newErrors.phone = "Invalid format";
     
     const passStrength = validatePasswordStrength(password);
-    if (!passStrength.isValid) newErrors.password = "Requires 8+ chars, upper, lower, digit, & symbol";
+    if (!passStrength.isValid) newErrors.password = "Weak password";
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -171,7 +170,6 @@ export default function LandingPage() {
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
       
-      // Verify profile exists
       const userRef = doc(db, 'userProfiles', result.user.uid);
       const userSnap = await getDoc(userRef);
       if (!userSnap.exists()) {
@@ -240,6 +238,7 @@ export default function LandingPage() {
       if (error.code === 'auth/email-already-in-use') message = 'This email is already registered.';
       else if (error.code === 'auth/invalid-credential') message = 'Invalid email or password.';
       else if (error.code === 'auth/popup-blocked') message = 'Popup blocked! Please allow popups for this site in your browser settings to sign in with Google.';
+      else if (error.code === 'auth/unauthorized-domain') message = 'This domain is not authorized for Google Sign-In. Please add your current URL to the "Authorized Domains" list in your Firebase Console.';
       else message = error.message;
     }
     toast({ variant: 'destructive', title: 'Authentication Error', description: message });
@@ -403,7 +402,6 @@ export default function LandingPage() {
                     {showSignupPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
-                {errors.password && <p className="text-[9px] text-red-500 mt-1">{errors.password}</p>}
               </div>
 
               <Button type="submit" className="w-full h-12 rounded-xl font-bold shadow-lg" disabled={loading}>
