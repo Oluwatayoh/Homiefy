@@ -9,11 +9,12 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { 
   TrendingUp, CheckCircle2, MoreHorizontal, Wallet, Loader2, AlertCircle, 
   AlertTriangle, ArrowRight, History, Plus, ShieldCheck, XCircle, 
-  BrainCircuit, PieChart, Target, Sparkles, Activity
+  BrainCircuit, PieChart, Target, Sparkles, Activity, PlusCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -72,7 +73,7 @@ export default function Dashboard() {
     );
   }, [userData?.familyId, db]);
 
-  const { data: goalsData } = useCollection(goalsQuery);
+  const { data: goalsData, isLoading: isGoalsLoading } = useCollection(goalsQuery);
 
   const decisionsQuery = useMemoFirebase(() => {
     if (!userData?.familyId) return null;
@@ -105,7 +106,7 @@ export default function Dashboard() {
     }
   }, [userData?.familyId, db, isStaff, user?.uid]);
 
-  const { data: pendingApprovals } = useCollection(approvalsQuery);
+  const { data: pendingApprovals, isLoading: isApprovalsLoading } = useCollection(approvalsQuery);
 
   const stsData = useMemo(() => {
     if (!budgetData || !mounted) return { 
@@ -115,7 +116,9 @@ export default function Dashboard() {
       alerts: [], 
       totalAllocated: 0, 
       totalSpent: 0,
-      pieData: []
+      pieData: [],
+      totalHealthScore: 0,
+      breakdown: { adherenceScore: 0, savingsScore: 0, goalScore: 0, impulseScore: 0 }
     };
 
     const totalAllocated = budgetData.envelopes?.reduce((sum: number, e: any) => sum + (e.allocated || 0), 0) || 0;
@@ -149,17 +152,12 @@ export default function Dashboard() {
     if (remainingBudget <= 0) status = 'red';
     else if (percentSpent > 80) status = 'yellow';
 
-    // FR7.3 Health Score Calculation
-    // Adherence (40): 40 * (1 - overflow_ratio)
     const adherenceScore = Math.max(0, 40 * (1 - (totalSpent > totalAllocated ? (totalSpent - totalAllocated) / totalAllocated : 0)));
-    // Savings Rate (30): Simplified as 30 * (1 - spending_ratio) if income is known
     const spendingRatio = budgetData.totalIncome > 0 ? totalSpent / budgetData.totalIncome : 1;
     const savingsScore = Math.max(0, 30 * (1 - spendingRatio));
-    // Goal Progress (20): Average progress of top goals
     const goalScore = goalsData?.length 
       ? (goalsData.reduce((sum, g) => sum + (g.currentAmount / g.targetAmount), 0) / goalsData.length) * 20
       : 0;
-    // Impulse Control (10): 10 * (1 - impulse_ratio) based on decisions
     const impulseRatio = recentDecisions?.length 
       ? recentDecisions.filter(d => d.userAction === 'proceeded' && d.aiAnalysis.regretScore > 50).length / recentDecisions.length
       : 0;
@@ -234,101 +232,109 @@ export default function Dashboard() {
     }
   };
 
-  if (isUserLoading || isUserDataLoading || isBudgetLoading || !mounted) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+  if (!mounted) return null;
 
   return (
-    <div className="flex flex-col gap-6 p-6 pb-24">
+    <div className="flex flex-col gap-6 p-6 pb-24 animate-in fade-in duration-500">
       <header className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold font-headline">{userData?.familyId ? "My Household" : "Welcome"}</h1>
           <p className="text-muted-foreground text-sm">Family Dashboard</p>
         </div>
         <div className="flex -space-x-2">
-          <Avatar className="border-2 border-background w-8 h-8 cursor-pointer" onClick={() => router.push('/profile')}>
-            <AvatarFallback className="text-[10px] bg-secondary text-primary font-bold">
-              {user?.displayName?.[0] || 'U'}
-            </AvatarFallback>
-          </Avatar>
+          {isUserDataLoading ? (
+            <Skeleton className="w-8 h-8 rounded-full" />
+          ) : (
+            <Avatar className="border-2 border-background w-8 h-8 cursor-pointer" onClick={() => router.push('/profile')}>
+              <AvatarFallback className="text-[10px] bg-secondary text-primary font-bold">
+                {user?.displayName?.[0] || 'U'}
+              </AvatarFallback>
+            </Avatar>
+          )}
         </div>
       </header>
 
-      {/* Safe to Spend Widget (FR7.1.1) */}
-      <Card className={cn(
-        "text-white border-none shadow-xl overflow-hidden relative transition-colors duration-500",
-        stsData.status === 'green' ? "bg-emerald-600" : 
-        stsData.status === 'yellow' ? "bg-amber-500" : "bg-destructive"
-      )}>
-        <div className="absolute top-0 right-0 p-4 opacity-10">
-          <Wallet className="w-32 h-32" />
-        </div>
-        <CardContent className="pt-8">
-          <p className="text-white/80 text-sm font-medium">Safe to spend today</p>
-          <div className="flex items-baseline gap-2 mt-1">
-            <h2 className="text-5xl font-bold tracking-tight">${stsData.amount.toFixed(2)}</h2>
+      {/* Safe to Spend Widget */}
+      {isBudgetLoading ? (
+        <Skeleton className="h-[180px] w-full rounded-2xl" />
+      ) : (
+        <Card className={cn(
+          "text-white border-none shadow-xl overflow-hidden relative transition-colors duration-500",
+          stsData.status === 'green' ? "bg-emerald-600" : 
+          stsData.status === 'yellow' ? "bg-amber-500" : "bg-destructive"
+        )}>
+          <div className="absolute top-0 right-0 p-4 opacity-10">
+            <Wallet className="w-32 h-32" />
           </div>
-          <div className="mt-4 flex items-center gap-2">
-            {stsData.status === 'green' && (
-              <p className="text-white/90 text-xs flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" /> Budget is healthy
-              </p>
-            )}
-            {stsData.status === 'yellow' && (
-              <p className="text-white/90 text-xs flex items-center gap-1">
-                <AlertCircle className="w-3 h-3" /> Caution: Approaching limit
-              </p>
-            )}
-            {stsData.status === 'red' && (
-              <p className="text-white/90 text-xs flex items-center gap-1 font-bold">
-                <AlertTriangle className="w-3 h-3" /> OVER BUDGET ALERT
-              </p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Health Score Gauge (FR7.1.2) */}
-      <Card className="border-none shadow-sm bg-white overflow-hidden cursor-pointer hover:bg-secondary/5 transition-colors" onClick={() => setShowScoreBreakdown(true)}>
-        <CardContent className="p-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="relative w-16 h-16 flex items-center justify-center">
-              <ResponsiveContainer width="100%" height="100%">
-                <RePieChart>
-                  <Pie
-                    data={[
-                      { value: stsData.totalHealthScore },
-                      { value: 100 - stsData.totalHealthScore }
-                    ]}
-                    innerRadius={24}
-                    outerRadius={30}
-                    startAngle={90}
-                    endAngle={-270}
-                    dataKey="value"
-                    stroke="none"
-                  >
-                    <Cell fill="hsl(var(--primary))" />
-                    <Cell fill="hsl(var(--secondary))" />
-                  </Pie>
-                </RePieChart>
-              </ResponsiveContainer>
-              <span className="absolute font-bold text-xs">{stsData.totalHealthScore}</span>
+          <CardContent className="pt-8">
+            <p className="text-white/80 text-sm font-medium">Safe to spend today</p>
+            <div className="flex items-baseline gap-2 mt-1">
+              <h2 className="text-5xl font-bold tracking-tight">${stsData.amount.toFixed(2)}</h2>
             </div>
-            <div>
-              <h3 className="text-sm font-bold">Budget Health Score</h3>
-              <p className="text-[10px] text-muted-foreground">Tap to see behavioral breakdown</p>
+            <div className="mt-4 flex items-center gap-2">
+              {stsData.status === 'green' && (
+                <p className="text-white/90 text-xs flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> Budget is healthy
+                </p>
+              )}
+              {stsData.status === 'yellow' && (
+                <p className="text-white/90 text-xs flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" /> Caution: Approaching limit
+                </p>
+              )}
+              {stsData.status === 'red' && (
+                <p className="text-white/90 text-xs flex items-center gap-1 font-bold">
+                  <AlertTriangle className="w-3 h-3" /> OVER BUDGET ALERT
+                </p>
+              )}
             </div>
-          </div>
-          <Sparkles className="h-5 w-5 text-accent animate-pulse" />
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* Spending Visualization (FR7.2) */}
-      {stsData.pieData.length > 0 && (
+      {/* Health Score Gauge */}
+      {isBudgetLoading || isGoalsLoading ? (
+        <Skeleton className="h-[96px] w-full rounded-xl" />
+      ) : (
+        <Card className="border-none shadow-sm bg-white overflow-hidden cursor-pointer hover:bg-secondary/5 transition-colors" onClick={() => setShowScoreBreakdown(true)}>
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="relative w-16 h-16 flex items-center justify-center">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RePieChart>
+                    <Pie
+                      data={[
+                        { value: stsData.totalHealthScore },
+                        { value: 100 - stsData.totalHealthScore }
+                      ]}
+                      innerRadius={24}
+                      outerRadius={30}
+                      startAngle={90}
+                      endAngle={-270}
+                      dataKey="value"
+                      stroke="none"
+                    >
+                      <Cell fill="hsl(var(--primary))" />
+                      <Cell fill="hsl(var(--secondary))" />
+                    </Pie>
+                  </RePieChart>
+                </ResponsiveContainer>
+                <span className="absolute font-bold text-xs">{stsData.totalHealthScore}</span>
+              </div>
+              <div>
+                <h3 className="text-sm font-bold">Budget Health Score</h3>
+                <p className="text-[10px] text-muted-foreground">Tap to see behavioral breakdown</p>
+              </div>
+            </div>
+            <Sparkles className="h-5 w-5 text-accent animate-pulse" />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Spending Visualization */}
+      {isBudgetLoading ? (
+        <Skeleton className="h-[240px] w-full rounded-xl" />
+      ) : stsData.pieData.length > 0 ? (
         <section>
           <div className="flex items-center justify-between mb-3 px-1">
             <h3 className="font-semibold flex items-center gap-2">
@@ -361,10 +367,15 @@ export default function Dashboard() {
             </ChartContainer>
           </Card>
         </section>
-      )}
+      ) : null}
 
       {/* Pending Approvals */}
-      {pendingApprovals && pendingApprovals.length > 0 && (
+      {isApprovalsLoading ? (
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-32 mb-2" />
+          <Skeleton className="h-16 w-full rounded-xl" />
+        </div>
+      ) : pendingApprovals && pendingApprovals.length > 0 ? (
         <section>
           <div className="flex items-center justify-between mb-3 px-1">
             <h3 className="font-semibold flex items-center gap-2">
@@ -396,10 +407,16 @@ export default function Dashboard() {
             ))}
           </div>
         </section>
-      )}
+      ) : null}
 
-      {/* Goal Progress (FR7.1.5) */}
-      {goalsData && goalsData.length > 0 && (
+      {/* Goal Progress */}
+      {isGoalsLoading ? (
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-32 mb-2" />
+          <Skeleton className="h-24 w-full rounded-xl" />
+          <Skeleton className="h-24 w-full rounded-xl" />
+        </div>
+      ) : (
         <section>
           <div className="flex items-center justify-between mb-3 px-1">
             <h3 className="font-semibold flex items-center gap-2">
@@ -407,21 +424,31 @@ export default function Dashboard() {
             </h3>
             <Button variant="ghost" size="sm" onClick={() => router.push('/goals')} className="text-xs h-8">View All</Button>
           </div>
-          <div className="space-y-3">
-            {goalsData.map((goal) => {
-              const percent = Math.min(100, (goal.currentAmount / goal.targetAmount) * 100);
-              return (
-                <Card key={goal.id} className="border-none bg-white shadow-sm p-4 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs font-bold">{goal.name}</span>
-                    <span className="text-[10px] font-bold text-primary">{Math.round(percent)}%</span>
-                  </div>
-                  <Progress value={percent} className="h-1.5" />
-                  <p className="text-[8px] text-muted-foreground text-right">Target: ${goal.targetAmount.toLocaleString()}</p>
-                </Card>
-              );
-            })}
-          </div>
+          {goalsData && goalsData.length > 0 ? (
+            <div className="space-y-3">
+              {goalsData.map((goal) => {
+                const percent = Math.min(100, (goal.currentAmount / goal.targetAmount) * 100);
+                return (
+                  <Card key={goal.id} className="border-none bg-white shadow-sm p-4 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-bold">{goal.name}</span>
+                      <span className="text-[10px] font-bold text-primary">{Math.round(percent)}%</span>
+                    </div>
+                    <Progress value={percent} className="h-1.5" />
+                    <p className="text-[8px] text-muted-foreground text-right">Target: ${goal.targetAmount.toLocaleString()}</p>
+                  </Card>
+                );
+              })}
+            </div>
+          ) : (
+            <Card className="border-dashed border-2 bg-secondary/10 p-6 flex flex-col items-center justify-center text-center gap-2 rounded-2xl">
+              <Target className="h-8 w-8 text-muted-foreground" />
+              <p className="text-xs font-medium text-muted-foreground">No active goals found.</p>
+              <Button size="sm" variant="outline" onClick={() => router.push('/goals')} className="text-[10px] font-bold h-7 gap-1">
+                <Plus className="h-3 w-3" /> Start A Goal
+              </Button>
+            </Card>
+          )}
         </section>
       )}
 
@@ -433,27 +460,41 @@ export default function Dashboard() {
             View All <ArrowRight className="h-3 w-3" />
           </Button>
         </div>
-        <div className="space-y-2">
-          {recentTxs?.map((tx) => (
-            <Card key={tx.id} className="border-none bg-white shadow-sm overflow-hidden" onClick={() => router.push(`/transactions?id=${tx.id}`)}>
-              <CardContent className="p-3 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center text-primary">
-                    <History className="h-4 w-4" />
+        {isTxsLoading ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map(i => <Skeleton key={i} className="h-14 w-full rounded-xl" />)}
+          </div>
+        ) : recentTxs && recentTxs.length > 0 ? (
+          <div className="space-y-2">
+            {recentTxs.map((tx) => (
+              <Card key={tx.id} className="border-none bg-white shadow-sm overflow-hidden" onClick={() => router.push(`/transactions?id=${tx.id}`)}>
+                <CardContent className="p-3 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center text-primary">
+                      <History className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold truncate max-w-[120px]">{tx.description || tx.category}</p>
+                      <p className="text-[10px] text-muted-foreground">{new Date(tx.date).toLocaleDateString()}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs font-bold truncate max-w-[120px]">{tx.description || tx.category}</p>
-                    <p className="text-[10px] text-muted-foreground">{new Date(tx.date).toLocaleDateString()}</p>
+                  <div className="text-right">
+                    <p className="text-xs font-bold text-primary">${tx.amount.toFixed(2)}</p>
+                    <p className="text-[8px] text-muted-foreground uppercase font-bold">{tx.category}</p>
                   </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs font-bold text-primary">${tx.amount.toFixed(2)}</p>
-                  <p className="text-[8px] text-muted-foreground uppercase font-bold">{tx.category}</p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <Card className="border-dashed border-2 bg-secondary/10 p-6 flex flex-col items-center justify-center text-center gap-2 rounded-2xl">
+            <History className="h-8 w-8 text-muted-foreground" />
+            <p className="text-xs font-medium text-muted-foreground">No recent transactions.</p>
+            <Button size="sm" variant="outline" onClick={() => router.push('/log')} className="text-[10px] font-bold h-7 gap-1">
+              <PlusCircle className="h-3 w-3" /> Add Your First
+            </Button>
+          </Card>
+        )}
       </section>
 
       {/* Quick Actions */}
@@ -480,7 +521,7 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* Health Score Breakdown Modal (FR7.3) */}
+      {/* Health Score Breakdown Modal */}
       <Dialog open={showScoreBreakdown} onOpenChange={setShowScoreBreakdown}>
         <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
