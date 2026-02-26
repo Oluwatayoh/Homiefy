@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Zap, ShieldCheck, Mail, Lock, Phone, Loader2, Fingerprint, AlertCircle } from 'lucide-react';
+import { Zap, ShieldCheck, Mail, Lock, Phone, Loader2, Fingerprint, Eye, EyeOff } from 'lucide-react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -28,6 +28,9 @@ export default function LandingPage() {
   const [lastName, setLastName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [hasBiometrics, setHasBiometrics] = useState(false);
+  
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
 
   // Validation States
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -52,7 +55,6 @@ export default function LandingPage() {
   };
 
   const validatePhone = (phone: string) => {
-    // Basic phone validation: allows +, digits, spaces, hyphens, parentheses
     return phone === '' || /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/im.test(phone);
   };
 
@@ -313,13 +315,20 @@ export default function LandingPage() {
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input 
-                    type="password" 
+                    type={showLoginPassword ? "text" : "password"}
                     placeholder="••••••••" 
-                    className="pl-10 h-12 rounded-xl" 
+                    className="pl-10 pr-10 h-12 rounded-xl" 
                     value={password} 
                     onChange={(e) => setPassword(e.target.value)} 
                     required 
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowLoginPassword(!showLoginPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    {showLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
               </div>
               
@@ -403,12 +412,19 @@ export default function LandingPage() {
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input 
-                    type="password" 
+                    type={showSignupPassword ? "text" : "password"}
                     placeholder="Min 8 characters" 
-                    className={cn("pl-10 h-12 rounded-xl", errors.password && "border-red-500")} 
+                    className={cn("pl-10 pr-10 h-12 rounded-xl", errors.password && "border-red-500")} 
                     value={password} 
                     onChange={(e) => setPassword(e.target.value)} 
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowSignupPassword(!showSignupPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    {showSignupPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
                 {errors.password ? (
                   <p className="text-[9px] text-red-500 leading-tight mt-1 ml-1">{errors.password}</p>
