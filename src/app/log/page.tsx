@@ -1,10 +1,9 @@
-
 "use client";
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { impulseSpendingDetection, type ImpulseSpendingDetectionOutput } from '@/ai/flows/impulse-spending-detection';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, doc, updateDoc, serverTimestamp, increment } from 'firebase/firestore';
+import { collection, doc, updateDoc } from 'firebase/firestore';
 import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -12,7 +11,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Plus, Smile, Meh, Frown, Sparkles, Brain, Camera, X, Check } from 'lucide-react';
+import { Loader2, Plus, Smile, Meh, Frown, Sparkles, Brain, Camera, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -23,6 +22,11 @@ export default function RapidLog() {
   const { toast } = useToast();
   const router = useRouter();
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const [desc, setDesc] = useState('');
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('');
@@ -30,14 +34,16 @@ export default function RapidLog() {
   const [loading, setLoading] = useState(false);
   const [impulseResult, setImpulseResult] = useState<ImpulseSpendingDetectionOutput | null>(null);
   
-  // Camera state
   const [showCamera, setShowCamera] = useState(false);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [receiptPhoto, setReceiptPhoto] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const currentMonthId = new Date().toISOString().slice(0, 7);
+  const currentMonthId = useMemo(() => {
+    if (!mounted) return '';
+    return new Date().toISOString().slice(0, 7);
+  }, [mounted]);
 
   const userDocRef = useMemoFirebase(() => {
     return user ? doc(db, 'users', user.uid) : null;
@@ -46,7 +52,7 @@ export default function RapidLog() {
   const { data: userData } = useDoc(userDocRef);
 
   const budgetDocRef = useMemoFirebase(() => {
-    return userData?.familyId ? doc(db, 'families', userData.familyId, 'budgets', currentMonthId) : null;
+    return userData?.familyId && currentMonthId ? doc(db, 'families', userData.familyId, 'budgets', currentMonthId) : null;
   }, [userData?.familyId, db, currentMonthId]);
 
   const { data: budgetData } = useDoc(budgetDocRef);
@@ -86,7 +92,7 @@ export default function RapidLog() {
         canvasRef.current.width = videoRef.current.videoWidth;
         canvasRef.current.height = videoRef.current.videoHeight;
         context.drawImage(videoRef.current, 0, 0);
-        const dataUrl = canvasRef.current.toDataURL('image/jpeg', 0.7); // Compression (FR4.2.4)
+        const dataUrl = canvasRef.current.toDataURL('image/jpeg', 0.7);
         setReceiptPhoto(dataUrl);
         setShowCamera(false);
       }
@@ -101,18 +107,16 @@ export default function RapidLog() {
     const familyId = userData.familyId;
 
     try {
-      // 1. AI Impulse Check (FR5.1)
       const result = await impulseSpendingDetection({
         transactionDetails: desc,
         amount: numericAmount,
         category,
         timestamp: new Date().toISOString(),
         previousSpendingPatterns: "Frequent dining and shopping entries.",
-        familyGoals: [], // Could pull goals from Firestore too
+        familyGoals: [],
       });
       setImpulseResult(result);
 
-      // 2. Save Transaction (FR4.1)
       const transactionsRef = collection(db, 'families', familyId, 'transactions');
       const transactionData = {
         familyId,
@@ -129,7 +133,6 @@ export default function RapidLog() {
 
       addDocumentNonBlocking(transactionsRef, transactionData);
 
-      // 3. Update Budget Envelope (FR4.1.6)
       if (budgetDocRef && budgetData) {
         const updatedEnvelopes = budgetData.envelopes.map((e: any) => 
           e.name === category ? { ...e, spent: (e.spent || 0) + numericAmount } : e
@@ -142,7 +145,6 @@ export default function RapidLog() {
         description: `$${amount} recorded for ${category}.`,
       });
 
-      // Clear form after delay or redirect
       setTimeout(() => router.push('/dashboard'), 2000);
 
     } catch (e: any) {
@@ -152,7 +154,7 @@ export default function RapidLog() {
     }
   }
 
-  if (isUserLoading) return <div className="p-10 text-center"><Loader2 className="animate-spin mx-auto" /></div>;
+  if (isUserLoading || !mounted) return <div className="p-10 text-center"><Loader2 className="animate-spin mx-auto" /></div>;
 
   return (
     <div className="p-6 pb-24 flex flex-col gap-6">
@@ -202,7 +204,6 @@ export default function RapidLog() {
           />
         </div>
 
-        {/* Receipt Capture (FR4.2) */}
         <div className="space-y-2">
           <label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Receipt</label>
           {!receiptPhoto ? (
@@ -257,7 +258,6 @@ export default function RapidLog() {
         </Button>
       </Card>
 
-      {/* Camera UI (Prompt Recommendation) */}
       {showCamera && (
         <div className="fixed inset-0 bg-black z-[100] flex flex-col">
           <div className="p-4 flex justify-between items-center text-white">

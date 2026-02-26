@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { doc, collection, query, orderBy, limit } from 'firebase/firestore';
@@ -10,7 +9,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, CheckCircle2, MoreHorizontal, Wallet, Loader2, AlertCircle, AlertTriangle, ArrowRight, History } from 'lucide-react';
+import { TrendingUp, CheckCircle2, MoreHorizontal, Wallet, Loader2, AlertCircle, AlertTriangle, ArrowRight, History, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function Dashboard() {
@@ -18,21 +17,28 @@ export default function Dashboard() {
   const db = useFirestore();
   const router = useRouter();
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const userDocRef = useMemoFirebase(() => {
     return user ? doc(db, 'users', user.uid) : null;
   }, [user, db]);
 
   const { data: userData, isLoading: isUserDataLoading } = useDoc(userDocRef);
 
-  const currentMonthId = useMemo(() => new Date().toISOString().slice(0, 7), []);
+  const currentMonthId = useMemo(() => {
+    if (!mounted) return '';
+    return new Date().toISOString().slice(0, 7);
+  }, [mounted]);
   
   const budgetDocRef = useMemoFirebase(() => {
-    return userData?.familyId ? doc(db, 'families', userData.familyId, 'budgets', currentMonthId) : null;
+    return userData?.familyId && currentMonthId ? doc(db, 'families', userData.familyId, 'budgets', currentMonthId) : null;
   }, [userData?.familyId, db, currentMonthId]);
 
   const { data: budgetData, isLoading: isBudgetLoading } = useDoc(budgetDocRef);
 
-  // Recent Transactions (FR7.1)
   const txQuery = useMemoFirebase(() => {
     if (!userData?.familyId) return null;
     return query(
@@ -44,9 +50,8 @@ export default function Dashboard() {
 
   const { data: recentTxs, isLoading: isTxsLoading } = useCollection(txQuery);
 
-  // Safe to Spend Calculation Logic (FR3.4)
   const stsData = useMemo(() => {
-    if (!budgetData) return { amount: 0, status: 'neutral', percentSpent: 0, alerts: [] };
+    if (!budgetData || !mounted) return { amount: 0, status: 'neutral', percentSpent: 0, alerts: [] };
 
     const totalAllocated = budgetData.envelopes?.reduce((sum: number, e: any) => sum + (e.allocated || 0), 0) || 0;
     const totalSpent = budgetData.envelopes?.reduce((sum: number, e: any) => sum + (e.spent || 0), 0) || 0;
@@ -72,7 +77,7 @@ export default function Dashboard() {
     else if (percentSpent > 80) status = 'yellow';
 
     return { amount, status, percentSpent, totalAllocated, totalSpent, alerts };
-  }, [budgetData]);
+  }, [budgetData, mounted]);
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -82,7 +87,7 @@ export default function Dashboard() {
     }
   }, [user, isUserLoading, userData, isUserDataLoading, router]);
 
-  if (isUserLoading || isUserDataLoading || isBudgetLoading) {
+  if (isUserLoading || isUserDataLoading || isBudgetLoading || !mounted) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -106,7 +111,6 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* Safe to Spend Hero (FR3.4) */}
       <Card className={cn(
         "text-white border-none shadow-xl overflow-hidden relative transition-colors duration-500",
         stsData.status === 'green' ? "bg-emerald-600" : 
@@ -140,7 +144,6 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* Recent Transactions (FR7.1) */}
       <section>
         <div className="flex items-center justify-between mb-3 px-1">
           <h3 className="font-semibold">Recent Activity</h3>
@@ -176,7 +179,6 @@ export default function Dashboard() {
         </div>
       </section>
 
-      {/* Shared Budget Overview (FR3.6) */}
       <section>
         <div className="flex items-center justify-between mb-3 px-1">
           <h3 className="font-semibold">Budget Progress</h3>
@@ -206,7 +208,6 @@ export default function Dashboard() {
         </Card>
       </section>
 
-      {/* Quick Actions */}
       <div className="grid grid-cols-2 gap-4 mt-2">
         <button 
           onClick={() => router.push('/log')}

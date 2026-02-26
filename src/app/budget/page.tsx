@@ -1,15 +1,14 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { doc, setDoc } from 'firebase/firestore';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Loader2, Plus, PieChart, Info, CheckCircle2, AlertTriangle, Wand2, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { Loader2, Info, CheckCircle2, AlertTriangle, Wand2, ChevronLeft, ChevronRight, Calendar, PieChart } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -33,9 +32,23 @@ export default function BudgetManagement() {
   const { toast } = useToast();
   const router = useRouter();
 
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const monthId = useMemo(() => currentDate.toISOString().slice(0, 7), [currentDate]);
-  const isCurrentMonth = monthId === new Date().toISOString().slice(0, 7);
+  const [mounted, setMounted] = useState(false);
+  const [currentDate, setCurrentDate] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+    setCurrentDate(new Date());
+  }, []);
+
+  const monthId = useMemo(() => {
+    if (!currentDate) return '';
+    return currentDate.toISOString().slice(0, 7);
+  }, [currentDate]);
+
+  const isCurrentMonth = useMemo(() => {
+    if (!mounted || !monthId) return false;
+    return monthId === new Date().toISOString().slice(0, 7);
+  }, [mounted, monthId]);
 
   const [income, setIncome] = useState<string>('');
   const [envelopes, setEnvelopes] = useState(DEFAULT_ENVELOPES.map(e => ({ ...e, spent: 0 })));
@@ -48,7 +61,7 @@ export default function BudgetManagement() {
   const { data: userData } = useDoc(userDocRef);
 
   const budgetDocRef = useMemoFirebase(() => {
-    return userData?.familyId ? doc(db, 'families', userData.familyId, 'budgets', monthId) : null;
+    return userData?.familyId && monthId ? doc(db, 'families', userData.familyId, 'budgets', monthId) : null;
   }, [userData?.familyId, db, monthId]);
 
   const { data: budgetData, isLoading: isBudgetLoading } = useDoc(budgetDocRef);
@@ -69,6 +82,7 @@ export default function BudgetManagement() {
   const isAdmin = userData?.role === 'Admin';
 
   const navigateMonth = (direction: number) => {
+    if (!currentDate) return;
     const nextDate = new Date(currentDate);
     nextDate.setMonth(currentDate.getMonth() + direction);
     setCurrentDate(nextDate);
@@ -133,7 +147,7 @@ export default function BudgetManagement() {
     }
   };
 
-  if (isUserLoading || isBudgetLoading) {
+  if (isUserLoading || isBudgetLoading || !mounted) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -173,7 +187,6 @@ export default function BudgetManagement() {
         </div>
       </header>
 
-      {/* Income & Overview Section */}
       <Card className="border-none shadow-xl bg-primary text-white overflow-hidden relative">
         <div className="absolute top-0 right-0 p-4 opacity-10">
           <PieChart className="w-32 h-32" />
@@ -222,7 +235,6 @@ export default function BudgetManagement() {
         </div>
       )}
 
-      {/* Envelope Management / Viewing (FR3.6) */}
       <section className="space-y-4">
         <div className="flex items-center justify-between px-1">
           <h3 className="font-semibold">Categories</h3>
@@ -277,7 +289,6 @@ export default function BudgetManagement() {
                     )}
                   </div>
                   
-                  {/* Progress Bar (FR3.6.3) */}
                   <div className="space-y-1">
                     <div className="flex justify-between items-center text-[10px] font-bold uppercase text-muted-foreground">
                       <span>{percent.toFixed(0)}%</span>
@@ -310,7 +321,7 @@ export default function BudgetManagement() {
         </Button>
       )}
 
-      {!isCurrentMonth && (
+      {!isCurrentMonth && mounted && (
         <div className="p-4 rounded-xl bg-secondary/30 flex items-center gap-3 text-sm text-muted-foreground">
           <Info className="h-5 w-5 text-primary" />
           You are viewing a historical budget. It cannot be modified.
