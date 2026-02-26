@@ -160,8 +160,7 @@ export default function LandingPage() {
 
     try {
       setLoading(true);
-      // Trigger native biometric prompt (WebAuthn)
-      // Note: In a real production environment, this would verify a stored challenge
+      // Prototype-friendly simulated verification using browser credentials API
       const challenge = new Uint8Array(32);
       window.crypto.getRandomValues(challenge);
 
@@ -174,12 +173,7 @@ export default function LandingPage() {
       });
 
       if (credential) {
-        // Since we can't store passwords, in a prototype we simulate the login success
-        // In production, the server would verify the credential assertion and return a Custom Token
         toast({ title: "Biometric Success", description: "Signing you in securely..." });
-        
-        // For demonstration purposes, if we have the email, we'd normally proceed to a secure session
-        // Here we just notify the user that biometrics worked
         router.push('/dashboard');
       }
     } catch (error: any) {
