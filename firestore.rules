@@ -1,35 +1,7 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    /**
-     * KINETY - Family Financial Behavior OS Security Rules
-     *
-     * CORE PHILOSOPHY:
-     * This ruleset implements a strict family-based authorization model. Access is primarily 
-     * governed by family membership and roles (Admin, Co-Manager, Member). We utilize a 
-     * denormalized authorization pattern where family membership and roles are stored 
-     * directly on documents to ensure high performance and Authorization Independence.
-     *
-     * DATA STRUCTURE:
-     * - /users/{userId}: Individual user profiles and preferences.
-     * - /families/{familyId}: The root container for family governance.
-     * - /families/{familyId}/[subcollections]: Budgets, Transactions, Decisions, 
-     *   Approvals, and Goals are nested under families for structural segregation.
-     *
-     * KEY SECURITY DECISIONS:
-     * - PROTOTYPING MODE: Rules enforce strict authorization (WHO can access) but are 
-     *   flexible on data schema (WHAT is being written) to allow rapid iteration.
-     * - AUTHORIZATION INDEPENDENCE: Every document in a family subcollection contains 
-     *   a `familyMembers` map (UID to Role). This eliminates the need for expensive 
-     *   get() calls to the parent family document and enables secure 'list' operations.
-     * - ROLE-BASED ACCESS: Admins have full control, Co-Managers can manage 
-     *   most financial data, and Members are restricted to logging and viewing.
-     * - RELATIONAL INTEGRITY: Essential fields like IDs and ownership links are 
-     *   validated during creation and made immutable during updates.
-     */
-
-    // --- Helper Functions ---
 
     function isSignedIn() {
       return request.auth != null;
@@ -39,140 +11,70 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Helper for update/delete to ensure document existence and ownership
-    function isExistingOwner(userId) {
-      return resource != null && isOwner(userId);
+    // Role helpers based on Family document
+    function getFamily(familyId) {
+      return get(/databases/$(database)/documents/families/$(familyId)).data;
     }
 
-    // Check if the current user is in the familyMembers map
-    function isFamilyMember(data) {
-      return isSignedIn() && data.familyMembers.keys().hasAny([request.auth.uid]);
+    function getRole(familyId) {
+      let family = getFamily(familyId);
+      return family.members[request.auth.uid];
     }
 
-    // Role-specific helpers
-    function getRole(data) {
-      return data.familyMembers[request.auth.uid];
+    function isAdmin(familyId) {
+      return isSignedIn() && getRole(familyId) == 'Admin';
     }
 
-    function isAdmin(data) {
-      return isSignedIn() && getRole(data) == 'Admin';
+    function isCoManager(familyId) {
+      return isSignedIn() && getRole(familyId) == 'Co-Manager';
     }
 
-    function isCoManager(data) {
-      return isSignedIn() && getRole(data) == 'Co-Manager';
+    function isStaff(familyId) {
+      let role = getRole(familyId);
+      return role == 'Admin' || role == 'Co-Manager';
     }
 
-    function isStaff(data) {
-      return isAdmin(data) || isCoManager(data);
+    function isMember(familyId) {
+      let family = getFamily(familyId);
+      return family.members.keys().hasAny([request.auth.uid]);
     }
 
-    // --- Collection Rules ---
-
-    /**
-     * @description Rules for individual user profiles. Users can only manage their own data.
-     * @path /users/{userId}
-     * @allow (create, get, update, list) if request.auth.uid == userId
-     * @deny (create) if request.auth.uid != userId
-     * @principle Ownership-based access; enforces path-to-data consistency for IDs.
-     */
     match /users/{userId} {
-      allow get, list: if isOwner(userId);
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if false; // Users are generally not deleted in the MVP
-    }
-
-    /**
-     * @description Rules for Family documents. Access controlled by the internal members map.
-     * @path /families/{familyId}
-     * @allow (get) if uid is in members map; (create) if signed in; (update) if Admin.
-     * @deny (update) if user is only a 'Member'.
-     * @principle Shared access via membership map; Admin-only governance.
-     */
-    match /families/{familyId} {
-      // Note: Family document uses 'members' map, while subcollections use 'familyMembers'
-      function isMemberOfFamilyDoc(data) {
-        return isSignedIn() && data.members.keys().hasAny([request.auth.uid]);
-      }
-      function isAdminOfFamilyDoc(data) {
-        return isSignedIn() && data.members[request.auth.uid] == 'Admin';
-      }
-
-      allow get: if isMemberOfFamilyDoc(resource.data);
-      allow list: if isSignedIn(); // Restricted by query filters in practice
+      allow get, list, update: if isOwner(userId);
       allow create: if isSignedIn();
-      allow update: if resource != null && isAdminOfFamilyDoc(resource.data);
-      allow delete: if false; // Family deletion requires specific logic (transfer ownership)
     }
 
-    /**
-     * @description Rules for family budgets. Only Admins/Co-Managers can create/edit.
-     * @path /families/{familyId}/budgets/{budgetId}
-     * @allow (get, list) if Family Member; (create, update) if Admin.
-     * @deny (create) if Member role.
-     * @principle Role-based restrictions for financial planning.
-     */
-    match /families/{familyId}/budgets/{budgetId} {
-      allow get, list: if isFamilyMember(resource.data);
-      allow create: if isSignedIn() && isAdmin(request.resource.data);
-      allow update: if resource != null && isAdmin(resource.data);
-      allow delete: if resource != null && isAdmin(resource.data);
-    }
+    match /families/{familyId} {
+      allow get: if isMember(familyId);
+      allow create: if isSignedIn();
+      allow update: if isAdmin(familyId);
+      
+      match /budgets/{budgetId} {
+        allow read: if isMember(familyId);
+        allow write: if isStaff(familyId);
+      }
+      
+      match /transactions/{transactionId} {
+        allow read: if isMember(familyId);
+        allow create: if isMember(familyId);
+        allow update, delete: if isStaff(familyId) || (resource.data.userId == request.auth.uid);
+      }
 
-    /**
-     * @description Rules for financial transactions. Members can log own; Staff can manage all.
-     * @path /families/{familyId}/transactions/{transactionId}
-     * @allow (get, list) if Family Member; (create) if member; (update) if Staff or owner.
-     * @deny (delete) if user did not create the transaction and is not Staff.
-     * @principle Collaborative logging with ownership and staff oversight.
-     */
-    match /families/{familyId}/transactions/{transactionId} {
-      allow get, list: if isFamilyMember(resource.data);
-      allow create: if isSignedIn() && isFamilyMember(request.resource.data) && request.resource.data.userId == request.auth.uid;
-      allow update: if resource != null && (isStaff(resource.data) || isOwner(resource.data.userId));
-      allow delete: if resource != null && (isStaff(resource.data) || isOwner(resource.data.userId));
-    }
+      match /decisions/{decisionId} {
+        allow read: if isMember(familyId);
+        allow write: if isMember(familyId);
+      }
 
-    /**
-     * @description Rules for AI spending decisions. Private to the requester and accessible by family staff.
-     * @path /families/{familyId}/decisions/{decisionId}
-     * @allow (get, list) if owner or Staff; (create) if signed in.
-     * @deny (update) if changing the userId or familyId.
-     * @principle Private decision history with management oversight.
-     */
-    match /families/{familyId}/decisions/{decisionId} {
-      allow get, list: if isFamilyMember(resource.data) && (isOwner(resource.data.userId) || isStaff(resource.data));
-      allow create: if isSignedIn() && isFamilyMember(request.resource.data) && request.resource.data.userId == request.auth.uid;
-      allow update: if resource != null && isOwner(resource.data.userId) && request.resource.data.userId == resource.data.userId;
-      allow delete: if resource != null && isOwner(resource.data.userId);
-    }
+      match /approvals/{approvalId} {
+        allow read: if isMember(familyId);
+        allow create: if isMember(familyId);
+        allow update: if isStaff(familyId);
+      }
 
-    /**
-     * @description Rules for spending approvals. Requesters can create; Staff can resolve.
-     * @path /families/{familyId}/approvals/{approvalId}
-     * @allow (get, list) if Family Member; (create) if requester; (update) if Staff.
-     * @deny (update) if requester tries to approve their own request.
-     * @principle Separation of duties; ensures only authorized roles resolve workflows.
-     */
-    match /families/{familyId}/approvals/{approvalId} {
-      allow get, list: if isFamilyMember(resource.data);
-      allow create: if isSignedIn() && isFamilyMember(request.resource.data) && request.resource.data.requesterId == request.auth.uid;
-      allow update: if resource != null && isStaff(resource.data) && resource.data.requesterId != request.auth.uid;
-      allow delete: if resource != null && isAdmin(resource.data);
-    }
-
-    /**
-     * @description Rules for family financial goals. Viewable by all; managed by staff.
-     * @path /families/{familyId}/goals/{goalId}
-     * @allow (get, list) if Family Member; (create, update, delete) if Staff.
-     * @deny (write) if Member role.
-     * @principle Collaborative visibility; privileged management.
-     */
-    match /families/{familyId}/goals/{goalId} {
-      allow get, list: if isFamilyMember(resource.data);
-      allow create: if isSignedIn() && isStaff(request.resource.data);
-      allow update: if resource != null && isStaff(resource.data);
-      allow delete: if resource != null && isStaff(resource.data);
+      match /goals/{goalId} {
+        allow read: if isMember(familyId);
+        allow write: if isStaff(familyId);
+      }
     }
   }
 }

@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Wallet, BrainCircuit, Target, PlusCircle, Settings } from 'lucide-react';
+import { LayoutDashboard, Wallet, BrainCircuit, Target, PlusCircle, UserCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function MobileNav() {
@@ -14,7 +14,7 @@ export default function MobileNav() {
     { icon: Wallet, label: 'Log', href: '/log' },
     { icon: PlusCircle, label: 'Pre-Spend', href: '/pre-spend', highlight: true },
     { icon: BrainCircuit, label: 'Habits', href: '/habits' },
-    { icon: Target, label: 'Goals', href: '/goals' },
+    { icon: UserCircle, label: 'Profile', href: '/profile' },
   ];
 
   return (
