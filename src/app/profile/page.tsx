@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -9,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { LogOut, User, Settings, Bell, Shield, ChevronRight, Loader2, Save, Camera, Upload, X } from 'lucide-react';
+import { LogOut, User as UserIcon, Settings, Bell, Shield, ChevronRight, Loader2, Save, Camera, Upload, X } from 'lucide-react';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from '@/hooks/use-toast';
@@ -31,11 +32,13 @@ export default function ProfilePage() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
   const [editPhoto, setEditPhoto] = useState<string | null>(null);
 
   useEffect(() => {
     if (userData) {
       setEditName(userData.name || '');
+      setEditPhone(userData.phoneNumber || '');
       setEditPhoto(userData.photoUrl || null);
     }
   }, [userData]);
@@ -66,6 +69,7 @@ export default function ProfilePage() {
     try {
       await setDoc(userDocRef, {
         name: editName,
+        phoneNumber: editPhone,
         photoUrl: editPhoto,
         lastLogin: serverTimestamp()
       }, { merge: true });
@@ -115,14 +119,15 @@ export default function ProfilePage() {
           <div className="flex items-center gap-4 mb-6">
             <div className="relative group">
               <Avatar className="h-16 w-16 border-2 border-primary/20">
-                <AvatarImage src={editPhoto || userData?.photoUrl || user.photoURL || ''} />
+                <AvatarImage src={editPhoto || ''} />
                 <AvatarFallback className="bg-primary/10 text-primary font-bold text-xl">
                   {userData?.name?.[0] || user.displayName?.[0] || 'U'}
                 </AvatarFallback>
               </Avatar>
               <button 
-                onClick={() => fileInputRef.current?.click()}
-                className="absolute inset-0 flex items-center justify-center bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={() => !editPhoto && fileInputRef.current?.click()}
+                disabled={!!editPhoto}
+                className="absolute inset-0 flex items-center justify-center bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity disabled:cursor-not-allowed"
               >
                 <Camera className="h-5 w-5" />
               </button>
@@ -142,7 +147,7 @@ export default function ProfilePage() {
             <AccordionItem value="personal-info" className="border-none">
               <AccordionTrigger className="flex items-center justify-between p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors hover:no-underline font-medium border-none data-[state=open]:rounded-b-none [&>svg]:hidden">
                 <div className="flex items-center gap-3">
-                  <User className="h-5 w-5 text-primary" />
+                  <UserIcon className="h-5 w-5 text-primary" />
                   <span>Personal Information</span>
                 </div>
                 <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-90" />
@@ -161,6 +166,18 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="space-y-2">
+                  <Label htmlFor="phone" className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">Mobile Number</Label>
+                  <Input 
+                    id="phone"
+                    value={editPhone} 
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    placeholder="e.g. +234 800 000 0000"
+                    className="rounded-xl h-11 bg-white"
+                  />
+                  {!editPhone && <p className="text-[9px] text-amber-600 font-bold italic">Missing: Please add your mobile number.</p>}
+                </div>
+
+                <div className="space-y-2">
                   <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">Profile Photo</Label>
                   <div className="flex flex-col gap-3">
                     <input 
@@ -176,6 +193,7 @@ export default function ProfilePage() {
                         size="sm" 
                         className="rounded-xl flex-1 gap-2 bg-white"
                         onClick={() => fileInputRef.current?.click()}
+                        disabled={!!editPhoto}
                       >
                         <Upload className="h-4 w-4" /> Upload New Photo
                       </Button>
@@ -184,16 +202,19 @@ export default function ProfilePage() {
                           variant="ghost" 
                           size="sm" 
                           className="rounded-xl text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => setEditPhoto(null)}
+                          onClick={() => {
+                            setEditPhoto(null);
+                            if (fileInputRef.current) fileInputRef.current.value = '';
+                          }}
                         >
-                          <X className="h-4 w-4" />
+                          <X className="h-4 w-4" /> Remove
                         </Button>
                       )}
                     </div>
                     {editPhoto ? (
-                      <p className="text-[9px] text-emerald-600 font-bold italic">New photo selected (unsaved).</p>
+                      <p className="text-[9px] text-emerald-600 font-bold italic">Photo selected (unsaved or current).</p>
                     ) : (
-                      !userData?.photoUrl && <p className="text-[9px] text-amber-600 font-bold italic">Missing: Please upload a photo.</p>
+                      <p className="text-[9px] text-amber-600 font-bold italic">No photo set. Please upload one.</p>
                     )}
                   </div>
                 </div>

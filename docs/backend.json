@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -10,6 +11,7 @@
         "email": { "type": "string", "format": "email" },
         "name": { "type": "string" },
         "photoUrl": { "type": "string" },
+        "phoneNumber": { "type": "string" },
         "familyId": { "type": "string" },
         "role": { "type": "string", "enum": ["Admin", "Co-Manager", "Member", "Child"] },
         "preferences": {
