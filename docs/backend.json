@@ -1,0 +1,736 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user account within the KINETY system, associated with a Google OAuth identity and family role.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity."
+        },
+        "googleId": {
+          "type": "string",
+          "description": "Unique identifier provided by Google OAuth for this user."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the user, obtained from Google OAuth, used for communication.",
+          "format": "email"
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name of the user."
+        },
+        "photoUrl": {
+          "type": "string",
+          "description": "Base64 encoded string of the user's profile photo. Null if no photo is uploaded."
+        },
+        "familyId": {
+          "type": "string",
+          "description": "Reference to the Family the user belongs to. Null if the user is not yet part of a family. (Relationship: Family 1:N User)"
+        },
+        "role": {
+          "type": "string",
+          "description": "Role of the user within their family, defining their permissions and capabilities.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "preferences": {
+          "type": "array",
+          "description": "User-specific preferences and settings.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the user account was created.",
+          "format": "date-time"
+        },
+        "lastLogin": {
+          "type": "string",
+          "description": "Timestamp of the user's last successful login.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "googleId",
+        "email",
+        "name",
+        "role",
+        "preferences",
+        "createdAt",
+        "lastLogin"
+      ]
+    },
+    "Family": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Family",
+      "type": "object",
+      "description": "Represents a family or shared household unit that collaboratively manages finances within KINETY.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Family entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The chosen name for the family or household."
+        },
+        "inviteCode": {
+          "type": "string",
+          "description": "A unique, temporary 6-digit code used by an Admin to invite new members to the family."
+        },
+        "inviteCodeExpires": {
+          "type": "string",
+          "description": "Timestamp indicating when the invite code becomes invalid.",
+          "format": "date-time"
+        },
+        "currency": {
+          "type": "string",
+          "description": "The primary currency (e.g., USD, EUR) used for all financial activities within this family."
+        },
+        "approvalThresholds": {
+          "type": "array",
+          "description": "Defines the spending limits for different roles within the family, above which an approval request is automatically triggered.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "createdBy": {
+          "type": "string",
+          "description": "Reference to the User who initially created this family. (Relationship: User 1:N Family)"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the family account was created.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "inviteCode",
+        "inviteCodeExpires",
+        "currency",
+        "approvalThresholds",
+        "createdBy",
+        "createdAt"
+      ]
+    },
+    "Budget": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Budget",
+      "type": "object",
+      "description": "Represents a zero-based, adaptive budget for a specific family and month, divided into spending envelopes.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Budget entity."
+        },
+        "familyId": {
+          "type": "string",
+          "description": "Reference to the Family this budget belongs to. (Relationship: Family 1:N Budget)"
+        },
+        "month": {
+          "type": "string",
+          "description": "The month and year this budget applies to, in YYYY-MM format."
+        },
+        "totalIncome": {
+          "type": "number",
+          "description": "The total monthly income or allocated funds for this budget period."
+        },
+        "envelopes": {
+          "type": "array",
+          "description": "A list of budget categories (envelopes) with their individual allocations and spending status.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "status": {
+          "type": "string",
+          "description": "Current status of the budget, indicating if it's actively being used or has been closed.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the budget was initially created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the budget was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "familyId",
+        "month",
+        "totalIncome",
+        "envelopes",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "BudgetEnvelope": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "BudgetEnvelope",
+      "type": "object",
+      "description": "Represents a single spending category or 'envelope' within a family's budget.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the budget envelope."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the budget envelope (e.g., 'Groceries', 'Utilities', 'Entertainment')."
+        },
+        "icon": {
+          "type": "string",
+          "description": "Identifier for an icon representing this budget envelope."
+        },
+        "allocated": {
+          "type": "number",
+          "description": "The total monetary amount allocated to this envelope for the current budget period."
+        },
+        "spent": {
+          "type": "number",
+          "description": "The cumulative amount spent from this envelope during the current budget period."
+        },
+        "remaining": {
+          "type": "number",
+          "description": "The remaining amount available in this envelope for the current budget period (calculated: allocated - spent)."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "icon",
+        "allocated",
+        "spent",
+        "remaining"
+      ]
+    },
+    "Transaction": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Transaction",
+      "type": "object",
+      "description": "Represents a single financial expenditure logged by a family member.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Transaction entity."
+        },
+        "familyId": {
+          "type": "string",
+          "description": "Reference to the Family this transaction belongs to. (Relationship: Family 1:N Transaction)"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User who logged or is responsible for this transaction. (Relationship: User 1:N Transaction)"
+        },
+        "amount": {
+          "type": "number",
+          "description": "The monetary amount of the transaction."
+        },
+        "category": {
+          "type": "string",
+          "description": "The budget category (envelope) this transaction falls under."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional description or notes for the transaction."
+        },
+        "receiptPhoto": {
+          "type": "string",
+          "description": "Base64 encoded string of the receipt photo, if attached. Null if no photo."
+        },
+        "date": {
+          "type": "string",
+          "description": "Date and time when the transaction occurred or was logged.",
+          "format": "date-time"
+        },
+        "approvalStatus": {
+          "type": "string",
+          "description": "Current approval status of the transaction, especially if it exceeded a threshold.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the transaction record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the transaction record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "familyId",
+        "userId",
+        "amount",
+        "category",
+        "date",
+        "approvalStatus",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Decision": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Decision",
+      "type": "object",
+      "description": "Records a user's request for AI-powered pre-spending analysis and its outcome.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Decision entity."
+        },
+        "familyId": {
+          "type": "string",
+          "description": "Reference to the Family associated with this decision request. (Relationship: Family 1:N Decision)"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User who requested this spending decision analysis. (Relationship: User 1:N Decision)"
+        },
+        "amount": {
+          "type": "number",
+          "description": "The proposed spending amount for which the decision analysis was requested."
+        },
+        "category": {
+          "type": "string",
+          "description": "The proposed budget category for the spending."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional description of the proposed purchase, provided by the user."
+        },
+        "aiAnalysis": {
+          "type": "array",
+          "description": "Detailed analysis and insights provided by the AI decision engine for the proposed spending.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "userAction": {
+          "type": "string",
+          "description": "The action taken by the user after receiving the AI recommendation (e.g., proceeded, canceled, pending approval).",
+          "items": {
+            "type": "string"
+          }
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Timestamp when the decision analysis was requested.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "familyId",
+        "userId",
+        "amount",
+        "category",
+        "aiAnalysis",
+        "userAction",
+        "timestamp"
+      ]
+    },
+    "AIAnalysis": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "AIAnalysis",
+      "type": "object",
+      "description": "Detailed insights and recommendations generated by the AI for a pre-spending decision.",
+      "properties": {
+        "budgetImpact": {
+          "type": "array",
+          "description": "Details on how the proposed purchase impacts the current budget, including envelope balances and safe-to-spend.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "goalDelay": {
+          "type": "string",
+          "description": "Estimated delay this purchase would cause to active family financial goals."
+        },
+        "regretScore": {
+          "type": "number",
+          "description": "AI's prediction of the likelihood of regretting this purchase, on a scale of 0-100."
+        },
+        "alternatives": {
+          "type": "array",
+          "description": "Suggestions for lower-cost alternatives, delaying the purchase, or substitute categories.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "recommendation": {
+          "type": "string",
+          "description": "Overall recommendation from the AI regarding the proposed spending (e.g., 'Proceed Confidently', 'Reconsider').",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "budgetImpact",
+        "goalDelay",
+        "regretScore",
+        "alternatives",
+        "recommendation"
+      ]
+    },
+    "BudgetImpact": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "BudgetImpact",
+      "type": "object",
+      "description": "Specific metrics detailing the effect of a proposed purchase on the current budget.",
+      "properties": {
+        "remainingEnvelopeBalanceAfterPurchase": {
+          "type": "number",
+          "description": "The projected remaining balance in the relevant budget envelope after this purchase."
+        },
+        "percentageOfEnvelopeConsumed": {
+          "type": "number",
+          "description": "The percentage of the envelope's allocated amount that this purchase would consume."
+        },
+        "impactOnSafeToSpendAmount": {
+          "type": "number",
+          "description": "The change (positive or negative) in the daily safe-to-spend amount after this purchase."
+        },
+        "daysOfBudgetConsumed": {
+          "type": "number",
+          "description": "The number of days of the current budget that this single purchase would effectively consume."
+        }
+      },
+      "required": [
+        "remainingEnvelopeBalanceAfterPurchase",
+        "percentageOfEnvelopeConsumed",
+        "impactOnSafeToSpendAmount",
+        "daysOfBudgetConsumed"
+      ]
+    },
+    "Approval": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Approval",
+      "type": "object",
+      "description": "Manages the workflow for spending requests that exceed configured family approval thresholds.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Approval entity."
+        },
+        "familyId": {
+          "type": "string",
+          "description": "Reference to the Family for which this approval is requested. (Relationship: Family 1:N Approval)"
+        },
+        "requesterId": {
+          "type": "string",
+          "description": "Reference to the User who initiated the spending approval request. (Relationship: User 1:N Approval)"
+        },
+        "approverId": {
+          "type": "string",
+          "description": "Reference to the User who eventually approved or denied the request. Null if the request is still pending. (Relationship: User 1:N Approval)"
+        },
+        "transactionData": {
+          "type": "array",
+          "description": "A snapshot of the proposed transaction details for which approval is being sought.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "justification": {
+          "type": "string",
+          "description": "Optional justification provided by the requester for the proposed spending."
+        },
+        "aiRecommendation": {
+          "type": "array",
+          "description": "A snapshot of the AI's recommendation for the proposed spending at the time of the request.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "status": {
+          "type": "string",
+          "description": "Current status of the approval request (Pending, Approved, or Denied).",
+          "items": {
+            "type": "string"
+          }
+        },
+        "approverReason": {
+          "type": "string",
+          "description": "Optional reason or comment provided by the approver for their decision."
+        },
+        "approvedAmount": {
+          "type": "number",
+          "description": "The final amount approved for the transaction, which might be less than the requested amount. Null if no reduction or denied."
+        },
+        "requestedAt": {
+          "type": "string",
+          "description": "Timestamp when the approval request was initially made.",
+          "format": "date-time"
+        },
+        "resolvedAt": {
+          "type": "string",
+          "description": "Timestamp when the approval request was resolved (approved or denied). Null if still pending.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "familyId",
+        "requesterId",
+        "transactionData",
+        "aiRecommendation",
+        "status",
+        "requestedAt"
+      ]
+    },
+    "ApprovalTransactionData": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ApprovalTransactionData",
+      "type": "object",
+      "description": "Snapshot of transaction details stored within an approval request.",
+      "properties": {
+        "amount": {
+          "type": "number",
+          "description": "The proposed transaction amount."
+        },
+        "category": {
+          "type": "string",
+          "description": "The proposed transaction category."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional description for the proposed transaction."
+        },
+        "receiptPhoto": {
+          "type": "string",
+          "description": "Base64 encoded string of the receipt photo for the proposed transaction, if attached. Null if no photo."
+        },
+        "date": {
+          "type": "string",
+          "description": "The proposed date and time of the transaction.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "amount",
+        "category",
+        "date"
+      ]
+    },
+    "Goal": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Goal",
+      "type": "object",
+      "description": "Represents a collaborative financial objective set by a family.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Goal entity."
+        },
+        "familyId": {
+          "type": "string",
+          "description": "Reference to the Family this financial goal belongs to. (Relationship: Family 1:N Goal)"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the financial goal (e.g., 'New Car Fund', 'Vacation Savings')."
+        },
+        "targetAmount": {
+          "type": "number",
+          "description": "The total monetary amount required to achieve the goal."
+        },
+        "savedAmount": {
+          "type": "number",
+          "description": "The current amount saved towards the goal."
+        },
+        "targetDate": {
+          "type": "string",
+          "description": "The target date for achieving the goal.",
+          "format": "date-time"
+        },
+        "priority": {
+          "type": "string",
+          "description": "The priority level of the goal (e.g., High, Medium, Low).",
+          "items": {
+            "type": "string"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the goal was created.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "familyId",
+        "name",
+        "targetAmount",
+        "savedAmount",
+        "targetDate",
+        "priority",
+        "createdAt"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores individual user profiles, preferences, and their current family affiliation. Includes denormalized 'familyId' and 'role' for quick authorization lookup based on request.auth.uid.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user, matching Firebase Authentication UID (request.auth.uid)."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/families/{familyId}",
+        "definition": {
+          "entityName": "Family",
+          "schema": {
+            "$ref": "#/backend/entities/Family"
+          },
+          "description": "Represents a family unit. Includes a 'members' map (denormalized userId to role) for direct authorization checks within the family document itself. Also stores invite codes and approval thresholds.",
+          "params": [
+            {
+              "name": "familyId",
+              "description": "The unique identifier for the family."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/families/{familyId}/budgets/{budgetId}",
+        "definition": {
+          "entityName": "Budget",
+          "schema": {
+            "$ref": "#/backend/entities/Budget"
+          },
+          "description": "Stores a specific monthly budget for a family. Includes denormalized 'familyMembers' map for authorization independence and 'familyId' for queryability. BudgetEnvelopes are embedded within this document.",
+          "params": [
+            {
+              "name": "familyId",
+              "description": "The unique identifier for the parent family."
+            },
+            {
+              "name": "budgetId",
+              "description": "The unique identifier for the budget for a specific month."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/families/{familyId}/transactions/{transactionId}",
+        "definition": {
+          "entityName": "Transaction",
+          "schema": {
+            "$ref": "#/backend/entities/Transaction"
+          },
+          "description": "Logs individual financial expenditures by family members. Includes denormalized 'familyMembers' map for authorization independence, 'familyId' for queryability, and 'userId' of the logging user.",
+          "params": [
+            {
+              "name": "familyId",
+              "description": "The unique identifier for the parent family."
+            },
+            {
+              "name": "transactionId",
+              "description": "The unique identifier for the transaction."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/families/{familyId}/decisions/{decisionId}",
+        "definition": {
+          "entityName": "Decision",
+          "schema": {
+            "$ref": "#/backend/entities/Decision"
+          },
+          "description": "Records AI-powered pre-spending decision analyses. Includes denormalized 'familyMembers' map for authorization independence, 'familyId' for queryability, and 'userId' of the requester. AI analysis details are embedded.",
+          "params": [
+            {
+              "name": "familyId",
+              "description": "The unique identifier for the parent family."
+            },
+            {
+              "name": "decisionId",
+              "description": "The unique identifier for the decision request."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/families/{familyId}/approvals/{approvalId}",
+        "definition": {
+          "entityName": "Approval",
+          "schema": {
+            "$ref": "#/backend/entities/Approval"
+          },
+          "description": "Manages spending approval requests. Includes denormalized 'familyMembers' map for authorization independence, 'familyId' for queryability, 'requesterId', and 'approverId'. Proposed transaction data and AI recommendations are embedded.",
+          "params": [
+            {
+              "name": "familyId",
+              "description": "The unique identifier for the parent family."
+            },
+            {
+              "name": "approvalId",
+              "description": "The unique identifier for the approval request."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/families/{familyId}/goals/{goalId}",
+        "definition": {
+          "entityName": "Goal",
+          "schema": {
+            "$ref": "#/backend/entities/Goal"
+          },
+          "description": "Represents a collaborative financial goal set by a family. Includes denormalized 'familyMembers' map for authorization independence and 'familyId' for queryability.",
+          "params": [
+            {
+              "name": "familyId",
+              "description": "The unique identifier for the parent family."
+            },
+            {
+              "name": "goalId",
+              "description": "The unique identifier for the financial goal."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The recommended Firestore structure is designed with a strong emphasis on Authorization Independence, Structural Segregation, and adherence to QAPs (Query-Aware Permissions) to ensure robust, scalable, and easily debuggable security rules. The core strategy revolves around judicious denormalization of authorization context, particularly family membership and roles, into every relevant document.\n\n1.  Authorization Independence:\n    *   User documents (`/users/{userId}`): Each user's document directly stores their `familyId` and `role` within that family. This allows immediate identification of the user's current family and role based on `request.auth.uid` without needing to perform `get()` operations on other collections when evaluating user-specific access, for example to their own profile.\n    *   Family documents (`/families/{familyId}`): The `Family` document is the single source of truth for family-level permissions, containing a `members` map (`{userId: role}`). Rules directly on the `/families/{familyId}` path can check `resource.data.members[request.auth.uid]` for authorization, achieving full independence for operations on the family document itself.\n    *   Subcollection Documents (CRITICAL Denormalization): For all subcollections under a family (e.g., `budgets`, `transactions`, `decisions`, `approvals`, `goals`), the `members` map from the parent `Family` document is denormalized and copied into *every* document within these subcollections (e.g., as `familyMembers: {userId: role}`). This is a strict interpretation of the 'Authorization Independence' mandate to 'copy attributes into every document in the subcollection' to avoid `get()` calls in security rules. This makes authorization checks for documents in these subcollections highly efficient and independent, as rules can directly evaluate `resource.data.familyMembers[request.auth.uid]`, completely eliminating `get()` calls to parent documents for authorization purposes. This ensures that atomic operations on these subdocuments are not reliant on parent document data for authorization and simplifies rule debugging.\n\n2.  QAPs (Query-Aware Permissions):\n    *   Structural Segregation: By segregating all family-related data under `/families/{familyId}/{subcollection}`, it ensures that `list` queries are inherently constrained to a single family. This means users querying `transactions` will implicitly query `/families/{theirFamilyId}/transactions`. Security rules can then easily apply permissions based on the `familyId` path parameter.\n    *   Denormalized `familyMembers` for QAPs: The strict denormalization of the `familyMembers` map into each subcollection document is paramount for QAPs. Firestore security rules cannot perform `get()` operations during `list` requests. By having the `familyMembers` map directly within each `transaction`, `budget`, `decision`, `approval`, and `goal` document, `list` rules can efficiently check if `request.auth.uid` is a member of the family (i.e., `resource.data.familyMembers[request.auth.uid] != null`) *without any `get()` calls*. This enables secure and performant `list` operations while maintaining Authorization Independence.\n\n3.  Structural Segregation:\n    *   `users/{userId}`: Dedicated for individual user profiles and settings, accessible primarily by the user themselves or by administrators (if a global admin role were introduced, which is outside MVP scope but a consideration). Their `familyId` and `role` are here for their profile's context.\n    *   `families/{familyId}`: The root of all collaborative family data. All related budgets, transactions, decisions, approvals, and goals are organized as subcollections under their respective family. This creates a clear hierarchy for collaborative data and allows family-specific rules to be applied consistently.\n\nWhile the strict denormalization of `familyMembers` into every subcollection document introduces a data consistency overhead (requiring Cloud Functions to update all child documents when a family's members or roles change), it perfectly aligns with the critical mandate of Authorization Independence and enables straightforward, performant QAPs, making security rules simple and robust as requested. The use of clear, semantic path parameters (e.g., `{familyId}`, `{userId}`) further enhances debuggability and clarity of intent."
+  }
+}
