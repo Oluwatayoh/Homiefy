@@ -42,7 +42,8 @@ service cloud.firestore {
      * @description Rules for family units and their shared data.
      */
     match /families/{familyId} {
-      // Allow any signed-in user to 'get' or 'list' families (necessary for joining via code).
+      // Allow any signed-in user to 'get' families (necessary for joining via code).
+      // 'list' is also allowed but should be used sparingly.
       allow get, list: if isSignedIn();
       
       // Only the creator can create the family.
@@ -57,8 +58,8 @@ service cloud.firestore {
        * Access is granted if the user is a member of the family.
        */
       match /{allSubcollections=**} {
-        // For list operations, the query must also include a filter that matches this logic if it's data-bound.
-        // However, since we're using path-based parent checks, simple subcollection queries are allowed for members.
+        // We use the parent family membership check for all sub-data.
+        // For 'list' operations, Firestore requires the query to be restricted to the familyId path.
         allow get, list: if isMemberOfFamily(familyId);
         allow create, update, delete: if isMemberOfFamily(familyId);
       }

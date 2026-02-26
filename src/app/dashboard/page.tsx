@@ -61,6 +61,7 @@ export default function Dashboard() {
 
   const txQuery = useMemoFirebase(() => {
     if (!userData?.familyId || !user?.uid) return null;
+    // We target the specific family's transaction subcollection
     return query(
       collection(db, 'families', userData.familyId, 'transactions'),
       orderBy('date', 'desc'),
@@ -100,14 +101,12 @@ export default function Dashboard() {
     const baseCol = collection(db, 'families', userData.familyId, 'approvals');
     
     if (isStaff) {
-      // Leads see all pending requests for the family
       return query(
         baseCol,
         where('status', '==', 'Pending'),
         orderBy('requestedAt', 'desc')
       );
     } else {
-      // Members only see their own pending requests
       return query(
         baseCol,
         where('requesterId', '==', user.uid),
