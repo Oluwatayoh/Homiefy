@@ -7,7 +7,7 @@ service cloud.firestore {
      * 
      * CORE PHILOSOPHY:
      * 1. Path-based isolation for User Profiles.
-     * 2. Parent-document membership check for family sub-data.
+     * 2. Family membership is the gatekeeper for all shared household data.
      * 3. Membership is stored as a map on the Family document: members: { uid: role }
      */
 
@@ -33,7 +33,7 @@ service cloud.firestore {
      */
     match /userProfiles/{userId} {
       // Allow reading if it's the owner OR if the requester is in the same family.
-      // This is critical for showing names in the family roster.
+      // This allows family members to see each other's names/photos.
       allow read: if isOwner(userId) || (
         isSignedIn() && 
         resource.data.familyId != null && 
@@ -67,12 +67,20 @@ service cloud.firestore {
         )
       );
 
+      // Only admins can delete the family record.
       allow delete: if isSignedIn() && get(/databases/$(database)/documents/families/$(familyId)).data.members[request.auth.uid] == 'Admin';
 
       /**
-       * @description Rules for family sub-data (Transactions, Budgets, Goals, Approvals, Decisions)
-       * These allow access if the user is a member of the parent family.
+       * @description Explicit rules for family sub-data.
+       * Subcollections in Firestore do not inherit permissions from parents.
        */
+      match /transactions/{id} { allow read, write: if isFamilyMember(familyId); }
+      match /budgets/{id} { allow read, write: if isFamilyMember(familyId); }
+      match /goals/{id} { allow read, write: if isFamilyMember(familyId); }
+      match /approvals/{id} { allow read, write: if isFamilyMember(familyId); }
+      match /decisions/{id} { allow read, write: if isFamilyMember(familyId); }
+      
+      // Catch-all for any other nested subcollections
       match /{allSubcollections=**} {
         allow read, write: if isFamilyMember(familyId);
       }

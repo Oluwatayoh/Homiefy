@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Loader2, UserMinus, Shield, ShieldCheck, Copy, AlertCircle, User, RefreshCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
+import { cn } from '@/lib/utils';
 
 export default function FamilyManagement() {
   const { user, isUserLoading } = useUser();
@@ -201,7 +202,7 @@ export default function FamilyManagement() {
             
             // If we have profile data, use the name. Otherwise fallback to loading or UID
             const displayName = profile 
-              ? `${profile.firstName} ${profile.lastName}`.trim() || profile.email 
+              ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || profile.email || "Unnamed Member"
               : (isMe ? "You" : "Loading...");
 
             return (
