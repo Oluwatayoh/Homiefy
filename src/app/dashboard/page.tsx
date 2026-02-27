@@ -65,8 +65,6 @@ export default function Dashboard() {
 
   const isStaff = userData?.role === 'Admin' || userData?.role === 'Co-Manager';
 
-  // --- TRANSACTIONS COMMENTED OUT ---
-  /*
   const txQuery = useMemoFirebase(() => {
     if (!userData?.familyId || !user) return null;
     return query(
@@ -78,7 +76,6 @@ export default function Dashboard() {
   }, [userData?.familyId, db, user]);
 
   const { data: recentTxs, isLoading: isTxsLoading } = useCollection(txQuery);
-  */
 
   const goalsQuery = useMemoFirebase(() => {
     if (!userData?.familyId || !user) return null;
@@ -465,8 +462,7 @@ export default function Dashboard() {
         </section>
       )}
 
-      {/* Recent Activity - COMMENTED OUT */}
-      {/* 
+      {/* Recent Activity */}
       <section>
         <div className="flex items-center justify-between mb-3 px-1">
           <h3 className="font-semibold">Recent Activity</h3>
@@ -510,12 +506,9 @@ export default function Dashboard() {
           </Card>
         )}
       </section>
-      */}
 
       {/* Quick Actions */}
       <div className="grid grid-cols-2 gap-4 mt-2">
-        {/* Rapid Log Button - COMMENTED OUT AS PART OF TRANSACTIONS */}
-        {/* 
         <button 
           onClick={() => router.push('/log')}
           className="p-4 rounded-2xl bg-card shadow-sm border border-transparent hover:border-primary transition-all text-left group"
@@ -526,7 +519,6 @@ export default function Dashboard() {
           <p className="font-bold text-sm">Rapid Log</p>
           <p className="text-[10px] text-muted-foreground">Quick entry</p>
         </button>
-        */}
         <button 
           onClick={() => router.push('/pre-spend')}
           className="p-4 rounded-2xl bg-card shadow-sm border border-transparent hover:border-accent transition-all text-left group"
