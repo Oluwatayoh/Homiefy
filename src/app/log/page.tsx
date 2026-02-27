@@ -10,7 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Loader2, Plus, Smile, Meh, Frown, Camera, X, ShieldAlert } from 'lucide-react';
+import { Loader2, Plus, Smile, Meh, Frown, Camera, X, ShieldAlert, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -70,7 +70,10 @@ export default function RapidLog() {
 
   const { data: budgetData } = useDoc(budgetDocRef);
 
-  const envelopes = budgetData?.envelopes || [];
+  // Filter for spendable envelopes only
+  const envelopes = useMemo(() => {
+    return (budgetData?.envelopes || []).filter((e: any) => e.isSpendable !== false);
+  }, [budgetData]);
 
   const threshold = useMemo(() => {
     if (!familyData || !userData) return Infinity;
@@ -259,6 +262,12 @@ export default function RapidLog() {
                 {envelopes.map(e => (
                   <SelectItem key={e.id} value={e.name}>{e.name}</SelectItem>
                 ))}
+                {envelopes.length === 0 && (
+                   <div className="p-4 text-center text-xs text-muted-foreground flex flex-col items-center gap-2">
+                     <Lock className="h-4 w-4" />
+                     No spendable categories active for this month.
+                   </div>
+                )}
               </SelectContent>
             </Select>
           </div>

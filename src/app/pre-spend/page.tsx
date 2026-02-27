@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, ArrowRightCircle, Target, Sparkles, Brain, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Loader2, ArrowRightCircle, Target, Sparkles, Brain, CheckCircle2, AlertCircle, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
@@ -59,6 +59,11 @@ export default function PreSpendTool() {
   }, [userData?.familyId, db, currentMonthId]);
 
   const { data: budgetData } = useDoc(budgetDocRef);
+
+  // Filter for spendable envelopes only
+  const spendableEnvelopes = useMemo(() => {
+    return (budgetData?.envelopes || []).filter((e: any) => e.isSpendable !== false);
+  }, [budgetData]);
 
   const goalsQuery = useMemoFirebase(() => {
     if (!userData?.familyId) return null;
@@ -210,9 +215,15 @@ export default function PreSpendTool() {
                     <SelectValue placeholder="Envelope" />
                   </SelectTrigger>
                   <SelectContent>
-                    {budgetData?.envelopes.map((e: any) => (
+                    {spendableEnvelopes.map((e: any) => (
                       <SelectItem key={e.id} value={e.name}>{e.name}</SelectItem>
                     ))}
+                    {spendableEnvelopes.length === 0 && (
+                       <div className="p-4 text-center text-xs text-muted-foreground flex flex-col items-center gap-2">
+                         <Lock className="h-4 w-4" />
+                         No spendable categories available.
+                       </div>
+                    )}
                   </SelectContent>
                 </Select>
               </div>

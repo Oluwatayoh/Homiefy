@@ -8,13 +8,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { 
   Loader2, CheckCircle2, AlertTriangle, 
   ChevronLeft, ChevronRight, Calendar, PieChart, Plus, 
   Settings2, Home, Zap, ShoppingBasket, Car, Utensils, 
   Film, Stethoscope, User, PiggyBank, ShieldAlert, Heart, Gift, Briefcase, Globe, RefreshCcw,
-  Info
+  Info, Lock, Unlock
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
@@ -145,6 +147,10 @@ export default function BudgetManagement() {
     setEnvelopes(prev => prev.map(e => e.id === id ? { ...e, allocated: val } : e));
   };
 
+  const toggleSpendable = (id: string, checked: boolean) => {
+    setEnvelopes(prev => prev.map(e => e.id === id ? { ...e, isSpendable: checked } : e));
+  };
+
   const handleSaveBudget = async () => {
     if (!budgetDocRef || !isAdmin || !familyData) return;
     if (remainingIncome < 0) {
@@ -205,7 +211,7 @@ export default function BudgetManagement() {
     if (exists) {
       setEnvelopes(prev => prev.filter(e => e.id !== cat.id));
     } else {
-      setEnvelopes(prev => [...prev, { ...cat, allocated: 0, spent: 0 }]);
+      setEnvelopes(prev => [...prev, { ...cat, allocated: 0, spent: 0, isSpendable: true }]);
     }
   };
 
@@ -369,6 +375,7 @@ export default function BudgetManagement() {
                 const percent = env.allocated > 0 ? (env.spent / env.allocated) * 100 : 0;
                 const isWarning = percent >= 80 && percent < 100;
                 const isOver = percent >= 100;
+                const isLocked = env.isSpendable === false;
                 const Icon = ICON_MAP[env.icon] || PieChart;
                 
                 return (
@@ -382,10 +389,11 @@ export default function BudgetManagement() {
                           )}>
                             <Icon className="h-5 w-5" />
                           </div>
-                          <div>
+                          <div className="flex-1">
                             <h4 className="text-sm font-bold flex items-center gap-2">
                               {env.name}
                               {env.isCustom && <Badge variant="secondary" className="h-4 text-[8px] px-1 font-bold">CUSTOM</Badge>}
+                              {isLocked && <Badge variant="outline" className="h-4 text-[8px] px-1 font-bold border-amber-500 text-amber-600 gap-1"><Lock className="h-2 w-2" /> LOCKED</Badge>}
                             </h4>
                             <div className="flex items-center gap-2 mt-0.5">
                               <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">
@@ -460,60 +468,104 @@ export default function BudgetManagement() {
 
       {/* Manage Categories Dialog */}
       <Dialog open={showManageCategories} onOpenChange={setShowManageCategories}>
-        <DialogContent className="max-w-md max-h-[80vh] flex flex-col rounded-2xl">
-          <DialogHeader>
+        <DialogContent className="max-w-md max-h-[85vh] flex flex-col rounded-2xl overflow-hidden p-0">
+          <DialogHeader className="p-6 pb-2">
             <DialogTitle>Budget Envelopes</DialogTitle>
-            <DialogDescription>Select active categories for {formattedMonth}.</DialogDescription>
+            <DialogDescription>Select active categories and spending rules for {formattedMonth}.</DialogDescription>
           </DialogHeader>
           
-          <div className="flex-1 overflow-y-auto pr-2 py-4 space-y-6">
-            <div className="space-y-3">
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+            <div className="space-y-4">
               <h4 className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest px-1">Presets</h4>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-3">
                 {PRESET_CATEGORIES.map(cat => {
-                  const isEnabled = !!envelopes.find(e => e.id === cat.id);
+                  const activeEnv = envelopes.find(e => e.id === cat.id);
+                  const isEnabled = !!activeEnv;
+                  const isSpendable = activeEnv?.isSpendable !== false;
                   const Icon = ICON_MAP[cat.icon];
                   return (
-                    <button
-                      key={cat.id}
-                      onClick={() => toggleCategory(cat)}
-                      disabled={!isAdmin}
-                      className={cn(
-                        "flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left",
-                        isEnabled ? "border-primary bg-primary/5" : "border-transparent bg-secondary/20"
-                      )}
-                    >
-                      <div className={cn("p-2 rounded-lg", isEnabled ? "bg-primary text-white" : "bg-muted text-muted-foreground")}>
-                        <Icon className="h-4 w-4" />
+                    <div key={cat.id} className={cn(
+                      "flex flex-col gap-3 p-4 rounded-xl border-2 transition-all",
+                      isEnabled ? "border-primary bg-primary/5 shadow-sm" : "border-transparent bg-secondary/20"
+                    )}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={cn("p-2 rounded-lg", isEnabled ? "bg-primary text-white" : "bg-muted text-muted-foreground")}>
+                            <Icon className="h-4 w-4" />
+                          </div>
+                          <span className={cn("text-xs font-bold", isEnabled ? "text-primary" : "text-muted-foreground")}>{cat.name}</span>
+                        </div>
+                        <Button
+                          variant={isEnabled ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => toggleCategory(cat)}
+                          disabled={!isAdmin}
+                          className="h-8 rounded-lg text-[10px] font-bold"
+                        >
+                          {isEnabled ? "Remove" : "Add"}
+                        </Button>
                       </div>
-                      <span className={cn("text-xs font-bold", isEnabled ? "text-primary" : "text-muted-foreground")}>{cat.name}</span>
-                    </button>
+
+                      {isEnabled && isAdmin && (
+                        <div className="flex items-center justify-between pt-2 border-t border-primary/10">
+                          <div className="flex items-center gap-2">
+                            {isSpendable ? <Unlock className="h-3 w-3 text-emerald-500" /> : <Lock className="h-3 w-3 text-amber-500" />}
+                            <Label className="text-[10px] font-bold text-muted-foreground">Spendable from app?</Label>
+                          </div>
+                          <Switch 
+                            checked={isSpendable} 
+                            onCheckedChange={(checked) => toggleSpendable(cat.id, checked)}
+                          />
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
               <h4 className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest px-1">Family Custom Categories</h4>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {familyData?.customCategories?.map((cat: any) => {
-                  const isEnabled = !!envelopes.find(e => e.id === cat.id);
+                  const activeEnv = envelopes.find(e => e.id === cat.id);
+                  const isEnabled = !!activeEnv;
+                  const isSpendable = activeEnv?.isSpendable !== false;
                   return (
-                    <button
-                      key={cat.id}
-                      onClick={() => toggleCategory(cat)}
-                      disabled={!isAdmin}
-                      className={cn(
-                        "flex w-full items-center justify-between p-3 rounded-xl border-2 transition-all",
-                        isEnabled ? "border-primary bg-primary/5" : "border-secondary bg-secondary/30"
-                      )}
-                    >
-                      <div className="flex items-center gap-3">
-                        <PieChart className={cn("h-4 w-4", isEnabled ? "text-primary" : "text-muted-foreground")} />
-                        <span className={cn("text-sm font-bold", isEnabled ? "text-primary" : "text-muted-foreground")}>{cat.name}</span>
+                    <div key={cat.id} className={cn(
+                      "flex flex-col gap-3 p-4 rounded-xl border-2 transition-all",
+                      isEnabled ? "border-primary bg-primary/5 shadow-sm" : "border-secondary bg-secondary/30"
+                    )}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <PieChart className={cn("h-4 w-4", isEnabled ? "text-primary" : "text-muted-foreground")} />
+                          <span className={cn("text-xs font-bold", isEnabled ? "text-primary" : "text-muted-foreground")}>{cat.name}</span>
+                          <Badge variant="secondary" className="h-4 text-[8px] px-1 font-bold">CUSTOM</Badge>
+                        </div>
+                        <Button
+                          variant={isEnabled ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => toggleCategory(cat)}
+                          disabled={!isAdmin}
+                          className="h-8 rounded-lg text-[10px] font-bold"
+                        >
+                          {isEnabled ? "Remove" : "Add"}
+                        </Button>
                       </div>
-                      {isEnabled && <CheckCircle2 className="h-4 w-4 text-primary" />}
-                    </button>
+
+                      {isEnabled && isAdmin && (
+                        <div className="flex items-center justify-between pt-2 border-t border-primary/10">
+                          <div className="flex items-center gap-2">
+                            {isSpendable ? <Unlock className="h-3 w-3 text-emerald-500" /> : <Lock className="h-3 w-3 text-amber-500" />}
+                            <Label className="text-[10px] font-bold text-muted-foreground">Spendable from app?</Label>
+                          </div>
+                          <Switch 
+                            checked={isSpendable} 
+                            onCheckedChange={(checked) => toggleSpendable(cat.id, checked)}
+                          />
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
                 
@@ -542,9 +594,9 @@ export default function BudgetManagement() {
             </div>
           </div>
           
-          <DialogFooter>
-            <Button className="w-full rounded-xl" onClick={() => setShowManageCategories(false)}>Close</Button>
-          </DialogFooter>
+          <div className="p-6 border-t bg-secondary/5">
+            <Button className="w-full rounded-xl font-bold" onClick={() => setShowManageCategories(false)}>Update Budget Structure</Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
