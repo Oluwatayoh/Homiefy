@@ -53,6 +53,7 @@ export default function GoalsPage() {
   const currencyCode = userData?.preferences?.currency || familyData?.currencyCode || 'NGN';
   const currencySymbol = getCurrencySymbol(currencyCode);
 
+  // SIMPLIFIED: Using standard query for open rules
   const goalsQuery = useMemoFirebase(() => {
     if (!userData?.familyId) return null;
     return query(

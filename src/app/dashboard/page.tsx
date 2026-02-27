@@ -65,6 +65,7 @@ export default function Dashboard() {
 
   const isStaff = userData?.role === 'Admin' || userData?.role === 'Co-Manager';
 
+  // RESTORED: Transaction Query without complex membership filter for open rules
   const txQuery = useMemoFirebase(() => {
     if (!userData?.familyId) return null;
     return query(
@@ -337,44 +338,6 @@ export default function Dashboard() {
         </Card>
       )}
 
-      {/* Spending Visualization */}
-      {isBudgetLoading ? (
-        <Skeleton className="h-[240px] w-full rounded-xl" />
-      ) : stsData.pieData.length > 0 ? (
-        <section>
-          <div className="flex items-center justify-between mb-3 px-1">
-            <h3 className="font-semibold flex items-center gap-2">
-              <PieChart className="h-4 w-4 text-primary" /> Spending Mix
-            </h3>
-          </div>
-          <Card className="border-none shadow-sm p-4 h-[240px] flex items-center justify-center bg-card">
-             <ChartContainer 
-              config={Object.fromEntries(stsData.pieData.map(d => [d.name, { label: d.name, color: d.fill }]))}
-              className="w-full h-full"
-            >
-              <ResponsiveContainer width="100%" height="100%">
-                <RePieChart>
-                  <Pie
-                    data={stsData.pieData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                  >
-                    {stsData.pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                  <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-                </RePieChart>
-              </ResponsiveContainer>
-            </ChartContainer>
-          </Card>
-        </section>
-      ) : null}
-
       {/* Pending Approvals */}
       {isApprovalsLoading ? (
         <div className="space-y-2">
@@ -420,7 +383,6 @@ export default function Dashboard() {
         <div className="space-y-2">
           <Skeleton className="h-4 w-32 mb-2" />
           <Skeleton className="h-24 w-full rounded-xl" />
-          <Skeleton className="h-24 w-full rounded-xl" />
         </div>
       ) : (
         <section>
@@ -458,7 +420,7 @@ export default function Dashboard() {
         </section>
       )}
 
-      {/* Recent Activity */}
+      {/* RESTORED: Recent Activity Section */}
       <section>
         <div className="flex items-center justify-between mb-3 px-1">
           <h3 className="font-semibold">Recent Activity</h3>
@@ -503,7 +465,7 @@ export default function Dashboard() {
         )}
       </section>
 
-      {/* Quick Actions */}
+      {/* RESTORED: Quick Actions */}
       <div className="grid grid-cols-2 gap-4 mt-2">
         <button 
           onClick={() => router.push('/log')}
