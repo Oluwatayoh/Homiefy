@@ -4,12 +4,24 @@ import { Badge } from '@/components/ui/badge';
 import { BrainCircuit, Sparkles, TrendingDown, History, Info } from 'lucide-react';
 import { personalizedCoachingNudges } from '@/ai/flows/personalized-coaching-nudges';
 
+export const dynamic = 'force-dynamic';
+
 export default async function HabitIntelligence() {
-  const nudge = await personalizedCoachingNudges({
-    userName: "The Smith Family",
-    pastSpendingBehavior: "Frequent small dining transactions and recurring subscription overhead.",
-    familyFinancialGoals: FAMILY_DATA.goals.map(g => g.name).join(", "),
-  });
+  let nudgeMessage = "Your behavioral patterns are being analyzed. Check back soon for personalized insights!";
+
+  try {
+    const nudge = await personalizedCoachingNudges({
+      userName: "The Smith Family",
+      pastSpendingBehavior: "Frequent small dining transactions and recurring subscription overhead.",
+      familyFinancialGoals: FAMILY_DATA.goals.map(g => g.name).join(", "),
+    });
+    if (nudge?.nudgeMessage) {
+      nudgeMessage = nudge.nudgeMessage;
+    }
+  } catch (error) {
+    console.error("Failed to generate AI nudge:", error);
+    // Keep default message on error
+  }
 
   return (
     <div className="p-6 flex flex-col gap-6">
@@ -31,7 +43,7 @@ export default async function HabitIntelligence() {
             <span className="font-bold tracking-tight">AI Financial Coach</span>
           </div>
           <p className="text-lg font-medium leading-relaxed italic">
-            "{nudge.nudgeMessage}"
+            "{nudgeMessage}"
           </p>
           <div className="mt-6 flex items-center gap-2 text-xs font-bold text-white/80">
              <span className="inline-block p-1 bg-white/10 rounded-full"><Info className="h-3 w-3" /></span> Based on your last 30 days
@@ -65,7 +77,7 @@ export default async function HabitIntelligence() {
           ].map((trigger, i) => (
             <div key={i} className="flex items-center justify-between p-4 rounded-xl bg-card shadow-sm border">
               <div className="flex items-center gap-3">
-                <trigger.icon className={`h-5 w-5 ${trigger.color}`} />
+                <History className={`h-5 w-5 ${trigger.color}`} />
                 <div>
                   <p className="font-medium text-sm">{trigger.label}</p>
                   <p className="text-[10px] text-muted-foreground">Identified Trigger: {trigger.value}</p>
