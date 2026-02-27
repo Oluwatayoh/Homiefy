@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -65,11 +64,23 @@ export default function BudgetManagement() {
     return currentDate.toISOString().slice(0, 7);
   }, [currentDate]);
 
+  const formattedMonth = useMemo(() => {
+    if (!currentDate) return '';
+    return currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  }, [currentDate]);
+
   const prevMonthId = useMemo(() => {
     if (!currentDate) return '';
     const d = new Date(currentDate);
     d.setMonth(d.getMonth() - 1);
     return d.toISOString().slice(0, 7);
+  }, [currentDate]);
+
+  const formattedPrevMonth = useMemo(() => {
+    if (!currentDate) return '';
+    const d = new Date(currentDate);
+    d.setMonth(d.getMonth() - 1);
+    return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   }, [currentDate]);
 
   const isCurrentMonth = useMemo(() => {
@@ -108,7 +119,6 @@ export default function BudgetManagement() {
       setIncome(budgetData.totalIncome?.toString() || '');
       setEnvelopes(budgetData.envelopes || []);
     } else {
-      // RESET: If no data for this month, start with empty categories
       setIncome('');
       setEnvelopes([]);
     }
@@ -153,7 +163,7 @@ export default function BudgetManagement() {
       };
 
       await setDoc(budgetDocRef, data, { merge: true });
-      toast({ title: "Budget Saved", description: `Active budget for ${monthId} updated.` });
+      toast({ title: "Budget Saved", description: `Active budget for ${formattedMonth} updated.` });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Save Failed", description: e.message });
     } finally {
@@ -169,20 +179,19 @@ export default function BudgetManagement() {
       const prevSnap = await getDoc(prevBudgetRef);
       
       if (!prevSnap.exists()) {
-        toast({ variant: "destructive", title: "No Data", description: `No budget found for ${prevMonthId} to rollover.` });
+        toast({ variant: "destructive", title: "No Data", description: `No budget found for ${formattedPrevMonth} to rollover.` });
         return;
       }
 
       const prevData = prevSnap.data();
       setIncome(prevData.totalIncome?.toString() || '');
-      // Rollover copies the structure and allocation, but resets 'spent' to 0 for the new month
       const newEnvelopes = (prevData.envelopes || []).map((e: any) => ({
         ...e,
         spent: 0
       }));
       setEnvelopes(newEnvelopes);
       
-      toast({ title: "Rollover Successful", description: `Imported ${newEnvelopes.length} categories from ${prevMonthId}.` });
+      toast({ title: "Rollover Successful", description: `Imported setup from ${formattedPrevMonth}.` });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Rollover Failed", description: e.message });
     } finally {
@@ -275,9 +284,9 @@ export default function BudgetManagement() {
             <Button variant="ghost" size="icon" onClick={() => navigateMonth(-1)} className="h-7 w-7 rounded-lg">
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <div className="px-2 text-[10px] font-bold flex items-center gap-1 min-w-[70px] justify-center">
+            <div className="px-2 text-[10px] font-bold flex items-center gap-1 min-w-[100px] justify-center">
               <Calendar className="h-3 w-3 text-primary" />
-              {monthId}
+              {formattedMonth}
             </div>
             <Button 
               variant="ghost" 
@@ -418,11 +427,11 @@ export default function BudgetManagement() {
               {envelopes.length === 0 && (
                 <div className="p-12 text-center bg-secondary/10 border-dashed border-2 rounded-2xl">
                   <PieChart className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-                  <p className="text-sm text-muted-foreground font-medium">No active categories for {monthId}.</p>
+                  <p className="text-sm text-muted-foreground font-medium">No active categories for {formattedMonth}.</p>
                   {isAdmin && (
                     <div className="flex flex-col gap-2 mt-4">
                        <Button variant="link" onClick={() => setShowManageCategories(true)} className="text-primary font-bold">Manage Categories</Button>
-                       <Button variant="outline" size="sm" onClick={handleRollover} disabled={isRollingOver} className="rounded-xl mx-auto">Rollover from {prevMonthId}</Button>
+                       <Button variant="outline" size="sm" onClick={handleRollover} disabled={isRollingOver} className="rounded-xl mx-auto">Rollover from {formattedPrevMonth}</Button>
                     </div>
                   )}
                 </div>
@@ -447,8 +456,8 @@ export default function BudgetManagement() {
       <Dialog open={showManageCategories} onOpenChange={setShowManageCategories}>
         <DialogContent className="max-w-md max-h-[80vh] flex flex-col rounded-2xl">
           <DialogHeader>
-            <DialogTitle>Month Categories</DialogTitle>
-            <DialogDescription>Select the active envelopes for {monthId}.</DialogDescription>
+            <DialogTitle>Budget Envelopes</DialogTitle>
+            <DialogDescription>Select active categories for {formattedMonth}.</DialogDescription>
           </DialogHeader>
           
           <div className="flex-1 overflow-y-auto pr-2 py-4 space-y-6">
