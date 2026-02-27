@@ -19,14 +19,13 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Checks if the user is a member of the family.
-    // We look up the family document and check the members map.
+    // Checks if the user is a member of the family by looking up the family document.
     function isFamilyMember(familyId) {
       let family = get(/databases/$(database)/documents/families/$(familyId));
       return isSignedIn() && family != null && family.data.members[request.auth.uid] != null;
     }
 
-    // Checks if the requester and the target resource share the same familyId.
+    // Checks if the user is in the same family as the resource.
     function areInSameFamily(resourceFamilyId) {
       let myProfile = get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data;
       return isSignedIn() && resourceFamilyId != null && myProfile.familyId == resourceFamilyId;
@@ -39,7 +38,6 @@ service cloud.firestore {
      */
     match /userProfiles/{userId} {
       // Allow reading if owner OR if they are in the same family (to see names/avatars).
-      // This is critical for the Family page to list members.
       allow read: if isOwner(userId) || (isSignedIn() && areInSameFamily(resource.data.familyId));
       allow write: if isOwner(userId);
     }
@@ -51,14 +49,14 @@ service cloud.firestore {
       // Basic family access.
       allow get: if isSignedIn();
       
-      // Only members can list families they belong to.
+      // Allow listing families you belong to.
       allow list: if isSignedIn() && isFamilyMember(familyId);
       
       // Creation.
       allow create: if isSignedIn();
       
       // Update logic:
-      // 1. Existing members can update (Admin/Lead roles usually handled by app logic).
+      // 1. Existing members can update.
       // 2. New members can join by adding their own UID to the members map.
       allow update: if isSignedIn() && (
         isFamilyMember(familyId) || 
@@ -77,13 +75,6 @@ service cloud.firestore {
        * @description Explicit rules for family sub-data.
        * Subcollections in Firestore do not inherit permissions from parents.
        */
-      match /transactions/{id} { allow read, write: if isFamilyMember(familyId); }
-      match /budgets/{id} { allow read, write: if isFamilyMember(familyId); }
-      match /goals/{id} { allow read, write: if isFamilyMember(familyId); }
-      match /approvals/{id} { allow read, write: if isFamilyMember(familyId); }
-      match /decisions/{id} { allow read, write: if isFamilyMember(familyId); }
-      
-      // Catch-all for any other nested subcollections
       match /{allSubcollections=**} {
         allow read, write: if isFamilyMember(familyId);
       }

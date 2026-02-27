@@ -33,7 +33,7 @@ export default function FamilyManagement() {
   const { data: familyData, isLoading: isFamilyDataLoading } = useDoc(familyDocRef);
 
   // Fetch all user profiles in the family to display their actual names
-  // We filter by familyId to satisfy security rules for listing profiles
+  // This synchronized query satisfies security rules for household visibility
   const membersQuery = useMemoFirebase(() => {
     if (!userData?.familyId) return null;
     return query(
@@ -203,7 +203,6 @@ export default function FamilyManagement() {
             const profile = memberProfiles?.find(p => p.id === memberId);
             const isMe = memberId === user?.uid;
             
-            // If we have profile data, use the name. Otherwise fallback to loading or UID
             const displayName = profile 
               ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || profile.displayName || profile.email || "Unnamed Member"
               : (isMe ? (userData?.firstName ? `${userData.firstName} ${userData.lastName}` : "You") : "Loading...");

@@ -65,48 +65,52 @@ export default function Dashboard() {
 
   const isStaff = userData?.role === 'Admin' || userData?.role === 'Co-Manager';
 
-  // Simplified queries relying on Path-Based Parent Authorization
+  // Synchronized queries using membership filters to satisfy security rules
   const txQuery = useMemoFirebase(() => {
-    if (!userData?.familyId) return null;
+    if (!userData?.familyId || !user) return null;
     return query(
       collection(db, 'families', userData.familyId, 'transactions'),
+      where(`members.${user.uid}`, '!=', null),
       orderBy('date', 'desc'),
       limit(5)
     );
-  }, [userData?.familyId, db]);
+  }, [userData?.familyId, db, user]);
 
   const { data: recentTxs, isLoading: isTxsLoading } = useCollection(txQuery);
 
   const goalsQuery = useMemoFirebase(() => {
-    if (!userData?.familyId) return null;
+    if (!userData?.familyId || !user) return null;
     return query(
       collection(db, 'families', userData.familyId, 'goals'),
+      where(`members.${user.uid}`, '!=', null),
       orderBy('createdAt', 'desc'),
       limit(3)
     );
-  }, [userData?.familyId, db]);
+  }, [userData?.familyId, db, user]);
 
   const { data: goalsData, isLoading: isGoalsLoading } = useCollection(goalsQuery);
 
   const decisionsQuery = useMemoFirebase(() => {
-    if (!userData?.familyId) return null;
+    if (!userData?.familyId || !user) return null;
     return query(
       collection(db, 'families', userData.familyId, 'decisions'),
+      where(`members.${user.uid}`, '!=', null),
       orderBy('timestamp', 'desc'),
       limit(10)
     );
-  }, [userData?.familyId, db]);
+  }, [userData?.familyId, db, user]);
 
   const { data: recentDecisions } = useCollection(decisionsQuery);
 
   const approvalsQuery = useMemoFirebase(() => {
-    if (!userData?.familyId) return null;
+    if (!userData?.familyId || !user) return null;
     return query(
       collection(db, 'families', userData.familyId, 'approvals'),
+      where(`members.${user.uid}`, '!=', null),
       where('status', '==', 'Pending'),
       orderBy('requestedAt', 'desc')
     );
-  }, [userData?.familyId, db]);
+  }, [userData?.familyId, db, user]);
 
   const { data: pendingApprovals, isLoading: isApprovalsLoading } = useCollection(approvalsQuery);
 
@@ -242,7 +246,7 @@ export default function Dashboard() {
   if (!mounted) return null;
 
   return (
-    <div className="flex flex-col gap-6 p-6 pb-24 animate-in fade-in duration-500">
+    <div className="flex flex-col gap-6 p-6 pb-24 animate-in fade-in duration-500 bg-background min-h-screen">
       <header className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold font-headline">{userData?.familyId ? "My Household" : "Welcome"}</h1>
@@ -303,7 +307,7 @@ export default function Dashboard() {
       {isBudgetLoading || isGoalsLoading ? (
         <Skeleton className="h-[96px] w-full rounded-xl" />
       ) : (
-        <Card className="border-none shadow-sm overflow-hidden cursor-pointer hover:bg-secondary/5 transition-colors" onClick={() => setShowScoreBreakdown(true)}>
+        <Card className="border-none shadow-sm overflow-hidden cursor-pointer hover:bg-secondary/5 transition-colors bg-card" onClick={() => setShowScoreBreakdown(true)}>
           <CardContent className="p-4 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="relative w-16 h-16 flex items-center justify-center">
@@ -348,7 +352,7 @@ export default function Dashboard() {
               <PieChart className="h-4 w-4 text-primary" /> Spending Mix
             </h3>
           </div>
-          <Card className="border-none shadow-sm p-4 h-[240px] flex items-center justify-center">
+          <Card className="border-none shadow-sm p-4 h-[240px] flex items-center justify-center bg-card">
              <ChartContainer 
               config={Object.fromEntries(stsData.pieData.map(d => [d.name, { label: d.name, color: d.fill }]))}
               className="w-full h-full"
@@ -436,7 +440,7 @@ export default function Dashboard() {
               {goalsData.map((goal) => {
                 const percent = Math.min(100, (goal.currentAmount / (goal.targetAmount || 1)) * 100);
                 return (
-                  <Card key={goal.id} className="border-none shadow-sm p-4 space-y-2">
+                  <Card key={goal.id} className="border-none shadow-sm p-4 space-y-2 bg-card">
                     <div className="flex justify-between items-center">
                       <span className="text-xs font-bold">{goal.name}</span>
                       <span className="text-[10px] font-bold text-primary">{Math.round(percent)}%</span>
@@ -474,7 +478,7 @@ export default function Dashboard() {
         ) : recentTxs && recentTxs.length > 0 ? (
           <div className="space-y-2">
             {recentTxs.map((tx) => (
-              <Card key={tx.id} className="border-none shadow-sm overflow-hidden" onClick={() => router.push(`/transactions`)}>
+              <Card key={tx.id} className="border-none shadow-sm overflow-hidden bg-card" onClick={() => router.push(`/transactions`)}>
                 <CardContent className="p-3 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center text-primary">
@@ -530,7 +534,7 @@ export default function Dashboard() {
 
       {/* Health Score Breakdown Modal */}
       <Dialog open={showScoreBreakdown} onOpenChange={setShowScoreBreakdown}>
-        <DialogContent className="max-w-md rounded-2xl">
+        <DialogContent className="max-w-md rounded-2xl bg-card">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Activity className="h-5 w-5 text-primary" />
@@ -580,7 +584,7 @@ export default function Dashboard() {
 
       {/* Approval Decision Modal */}
       <Dialog open={!!selectedApproval} onOpenChange={(open) => !open && setSelectedApproval(null)}>
-        <DialogContent className="max-w-md rounded-2xl">
+        <DialogContent className="max-w-md rounded-2xl bg-card">
           <DialogHeader>
             <DialogTitle>Spending Request Review</DialogTitle>
             <DialogDescription>
