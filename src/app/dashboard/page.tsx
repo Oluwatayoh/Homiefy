@@ -66,46 +66,46 @@ export default function Dashboard() {
   const isStaff = userData?.role === 'Admin' || userData?.role === 'Co-Manager';
 
   const txQuery = useMemoFirebase(() => {
-    if (!userData?.familyId || !user) return null;
+    if (!userData?.familyId) return null;
     return query(
       collection(db, 'families', userData.familyId, 'transactions'),
       orderBy('date', 'desc'),
       limit(5)
     );
-  }, [userData?.familyId, db, user]);
+  }, [userData?.familyId, db]);
 
   const { data: recentTxs, isLoading: isTxsLoading } = useCollection(txQuery);
 
   const goalsQuery = useMemoFirebase(() => {
-    if (!userData?.familyId || !user) return null;
+    if (!userData?.familyId) return null;
     return query(
       collection(db, 'families', userData.familyId, 'goals'),
       orderBy('createdAt', 'desc'),
       limit(3)
     );
-  }, [userData?.familyId, db, user]);
+  }, [userData?.familyId, db]);
 
   const { data: goalsData, isLoading: isGoalsLoading } = useCollection(goalsQuery);
 
   const decisionsQuery = useMemoFirebase(() => {
-    if (!userData?.familyId || !user) return null;
+    if (!userData?.familyId) return null;
     return query(
       collection(db, 'families', userData.familyId, 'decisions'),
       orderBy('timestamp', 'desc'),
       limit(10)
     );
-  }, [userData?.familyId, db, user]);
+  }, [userData?.familyId, db]);
 
   const { data: recentDecisions } = useCollection(decisionsQuery);
 
   const approvalsQuery = useMemoFirebase(() => {
-    if (!userData?.familyId || !user) return null;
+    if (!userData?.familyId) return null;
     return query(
       collection(db, 'families', userData.familyId, 'approvals'),
       where('status', '==', 'Pending'),
       orderBy('requestedAt', 'desc')
     );
-  }, [userData?.familyId, db, user]);
+  }, [userData?.familyId, db]);
 
   const { data: pendingApprovals, isLoading: isApprovalsLoading } = useCollection(approvalsQuery);
 

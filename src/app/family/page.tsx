@@ -32,8 +32,8 @@ export default function FamilyManagement() {
 
   const { data: familyData, isLoading: isFamilyDataLoading } = useDoc(familyDocRef);
 
-  // Fetch all user profiles in the family to display names.
-  // Security rules permit this read for members of the same family (sharing familyId).
+  // Fetch all user profiles that belong to this family.
+  // We use this to resolve names and avatars.
   const membersQuery = useMemoFirebase(() => {
     if (!userData?.familyId) return null;
     return query(
@@ -151,6 +151,7 @@ export default function FamilyManagement() {
     );
   }
 
+  // Use the members list from the family document as the primary source of truth.
   const membersList = Object.entries(familyData.members || {});
 
   return (
@@ -200,12 +201,15 @@ export default function FamilyManagement() {
         </div>
         <div className="space-y-3">
           {membersList.map(([memberId, role]) => {
+            // Find the full profile from our profiles collection fetch.
             const profile = memberProfiles?.find(p => p.id === memberId);
             const isMe = memberId === user?.uid;
             
+            // Resolve the best display name possible.
             const firstName = profile?.firstName || (isMe ? userData?.firstName : '');
             const lastName = profile?.lastName || (isMe ? userData?.lastName : '');
-            const displayName = `${firstName} ${lastName}`.trim() || profile?.email || "Unnamed Member";
+            const fullName = `${firstName} ${lastName}`.trim();
+            const displayName = fullName || profile?.email || "Unnamed Member";
 
             return (
               <Card key={memberId} className="border-none shadow-sm overflow-hidden bg-card">
@@ -261,9 +265,13 @@ export default function FamilyManagement() {
               </Card>
             );
           })}
-          {isMembersLoading && membersList.map((_, i) => (
-            <Card key={i} className="border-none shadow-sm bg-card h-20 animate-pulse" />
-          ))}
+          {(isMembersLoading || isFamilyDataLoading) && membersList.length === 0 && (
+            <div className="flex flex-col gap-3">
+              {[1, 2, 3].map((i) => (
+                <Card key={i} className="border-none shadow-sm bg-card h-20 animate-pulse" />
+              ))}
+            </div>
+          )}
         </div>
       </section>
     </div>

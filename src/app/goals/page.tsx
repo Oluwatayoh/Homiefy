@@ -22,6 +22,10 @@ export default function GoalsPage() {
   const { toast } = useToast();
 
   const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const [showAddGoal, setShowAddGoal] = useState(false);
   const [showContribute, setShowContribute] = useState<any | null>(null);
   const [contributionAmount, setContributionAmount] = useState('');
@@ -33,10 +37,6 @@ export default function GoalsPage() {
     deadline: '',
     priority: 'Medium'
   });
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const userDocRef = useMemoFirebase(() => {
     return user ? doc(db, 'userProfiles', user.uid) : null;
@@ -54,13 +54,12 @@ export default function GoalsPage() {
   const currencySymbol = getCurrencySymbol(currencyCode);
 
   const goalsQuery = useMemoFirebase(() => {
-    if (!userData?.familyId || !user) return null;
+    if (!userData?.familyId) return null;
     return query(
       collection(db, 'families', userData.familyId, 'goals'),
-      where(`members.${user.uid}`, '!=', null),
       orderBy('createdAt', 'desc')
     );
-  }, [userData?.familyId, db, user]);
+  }, [userData?.familyId, db]);
 
   const { data: goals, isLoading } = useCollection(goalsQuery);
 
@@ -130,7 +129,7 @@ export default function GoalsPage() {
           </>
         ) : goals && goals.length > 0 ? (
           goals.map((goal) => {
-            const percent = Math.round((goal.currentAmount / goal.targetAmount) * 100);
+            const percent = Math.round((goal.currentAmount / (goal.targetAmount || 1)) * 100);
             return (
               <Card key={goal.id} className="border-none shadow-xl overflow-hidden">
                 <CardContent className="p-0">
