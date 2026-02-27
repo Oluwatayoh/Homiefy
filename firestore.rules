@@ -1,8 +1,9 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Open access to all documents and subcollections for development/testing.
-    // This allows any read or write operation regardless of authentication or data state.
+    // UNIVERSAL OPEN ACCESS
+    // This removes all security restrictions for development.
+    // Every read and write operation is allowed for all collections and subcollections.
     match /{allPaths=**} {
       allow read, write: if true;
     }

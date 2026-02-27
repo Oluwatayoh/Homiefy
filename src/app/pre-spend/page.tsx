@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { purchaseImpactAnalysis, type PurchaseImpactAnalysisOutput } from '@/ai/flows/purchase-impact-analysis-flow';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, collection, setDoc, query, where } from 'firebase/firestore';
+import { doc, collection, setDoc, query, orderBy, limit } from 'firebase/firestore';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -60,13 +60,15 @@ export default function PreSpendTool() {
 
   const { data: budgetData } = useDoc(budgetDocRef);
 
+  // Simplified query for open rules
   const goalsQuery = useMemoFirebase(() => {
-    if (!userData?.familyId || !user?.uid) return null;
+    if (!userData?.familyId) return null;
     return query(
       collection(db, 'families', userData.familyId, 'goals'),
-      where(`members.${user.uid}`, '!=', null)
+      orderBy('createdAt', 'desc'),
+      limit(10)
     );
-  }, [userData?.familyId, user?.uid, db]);
+  }, [userData?.familyId, db]);
 
   const { data: goalsData } = useCollection(goalsQuery);
 

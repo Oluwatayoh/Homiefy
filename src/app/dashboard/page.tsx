@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, collection, query, orderBy, limit, where, updateDoc, setDoc } from 'firebase/firestore';
+import { doc, collection, query, orderBy, limit, updateDoc, setDoc } from 'firebase/firestore';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -18,7 +18,6 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Pie, PieChart as RePieChart, Cell, ResponsiveContainer } from 'recharts';
 import { getCurrencySymbol } from '@/lib/currency';
 
@@ -65,7 +64,7 @@ export default function Dashboard() {
 
   const isStaff = userData?.role === 'Admin' || userData?.role === 'Co-Manager';
 
-  // RESTORED: Transaction Query without complex membership filter for open rules
+  // Simplified query for open rules
   const txQuery = useMemoFirebase(() => {
     if (!userData?.familyId) return null;
     return query(
@@ -77,6 +76,7 @@ export default function Dashboard() {
 
   const { data: recentTxs, isLoading: isTxsLoading } = useCollection(txQuery);
 
+  // Simplified query for open rules
   const goalsQuery = useMemoFirebase(() => {
     if (!userData?.familyId) return null;
     return query(
@@ -99,11 +99,11 @@ export default function Dashboard() {
 
   const { data: recentDecisions } = useCollection(decisionsQuery);
 
+  // Simplified query for open rules
   const approvalsQuery = useMemoFirebase(() => {
     if (!userData?.familyId) return null;
     return query(
       collection(db, 'families', userData.familyId, 'approvals'),
-      where('status', '==', 'Pending'),
       orderBy('requestedAt', 'desc')
     );
   }, [userData?.familyId, db]);
@@ -112,8 +112,10 @@ export default function Dashboard() {
 
   const filteredApprovals = useMemo(() => {
     if (!pendingApprovals || !user) return [];
-    if (isStaff) return pendingApprovals;
-    return pendingApprovals.filter(a => a.requesterId === user.uid);
+    // Only show pending items
+    const pending = pendingApprovals.filter(a => a.status === 'Pending');
+    if (isStaff) return pending;
+    return pending.filter(a => a.requesterId === user.uid);
   }, [pendingApprovals, isStaff, user]);
 
   const stsData = useMemo(() => {
@@ -121,7 +123,6 @@ export default function Dashboard() {
       amount: 0, 
       status: 'neutral', 
       percentSpent: 0, 
-      alerts: [], 
       totalAllocated: 0, 
       totalSpent: 0,
       pieData: [],
@@ -261,7 +262,6 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* Safe to Spend Widget */}
       {isBudgetLoading ? (
         <Skeleton className="h-[180px] w-full rounded-2xl" />
       ) : (
@@ -299,7 +299,6 @@ export default function Dashboard() {
         </Card>
       )}
 
-      {/* Health Score Gauge */}
       {isBudgetLoading || isGoalsLoading ? (
         <Skeleton className="h-[96px] w-full rounded-xl" />
       ) : (
@@ -338,7 +337,6 @@ export default function Dashboard() {
         </Card>
       )}
 
-      {/* Pending Approvals */}
       {isApprovalsLoading ? (
         <div className="space-y-2">
           <Skeleton className="h-4 w-32 mb-2" />
@@ -378,49 +376,44 @@ export default function Dashboard() {
         </section>
       ) : null}
 
-      {/* Goal Progress */}
-      {isGoalsLoading ? (
-        <div className="space-y-2">
-          <Skeleton className="h-4 w-32 mb-2" />
-          <Skeleton className="h-24 w-full rounded-xl" />
+      <section>
+        <div className="flex items-center justify-between mb-3 px-1">
+          <h3 className="font-semibold flex items-center gap-2">
+            <Target className="h-4 w-4 text-primary" /> Active Goals
+          </h3>
+          <Button variant="ghost" size="sm" onClick={() => router.push('/goals')} className="text-xs h-8">View All</Button>
         </div>
-      ) : (
-        <section>
-          <div className="flex items-center justify-between mb-3 px-1">
-            <h3 className="font-semibold flex items-center gap-2">
-              <Target className="h-4 w-4 text-primary" /> Active Goals
-            </h3>
-            <Button variant="ghost" size="sm" onClick={() => router.push('/goals')} className="text-xs h-8">View All</Button>
+        {isGoalsLoading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-20 w-full rounded-xl" />
           </div>
-          {goalsData && goalsData.length > 0 ? (
-            <div className="space-y-3">
-              {goalsData.map((goal) => {
-                const percent = Math.min(100, (goal.currentAmount / (goal.targetAmount || 1)) * 100);
-                return (
-                  <Card key={goal.id} className="border-none shadow-sm p-4 space-y-2 bg-card">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold">{goal.name}</span>
-                      <span className="text-[10px] font-bold text-primary">{Math.round(percent)}%</span>
-                    </div>
-                    <Progress value={percent} className="h-1.5" />
-                    <p className="text-[8px] text-muted-foreground text-right">Target: {currencySymbol}{goal.targetAmount.toLocaleString()}</p>
-                  </Card>
-                );
-              })}
-            </div>
-          ) : (
-            <Card className="border-dashed border-2 bg-secondary/10 p-6 flex flex-col items-center justify-center text-center gap-2 rounded-2xl">
-              <Target className="h-8 w-8 text-muted-foreground" />
-              <p className="text-xs font-medium text-muted-foreground">No active goals found.</p>
-              <Button size="sm" variant="outline" onClick={() => router.push('/goals')} className="text-[10px] font-bold h-7 gap-1">
-                <Plus className="h-3 w-3" /> Start A Goal
-              </Button>
-            </Card>
-          )}
-        </section>
-      )}
+        ) : goalsData && goalsData.length > 0 ? (
+          <div className="space-y-3">
+            {goalsData.map((goal) => {
+              const percent = Math.min(100, (goal.currentAmount / (goal.targetAmount || 1)) * 100);
+              return (
+                <Card key={goal.id} className="border-none shadow-sm p-4 space-y-2 bg-card">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-bold">{goal.name}</span>
+                    <span className="text-[10px] font-bold text-primary">{Math.round(percent)}%</span>
+                  </div>
+                  <Progress value={percent} className="h-1.5" />
+                  <p className="text-[8px] text-muted-foreground text-right">Target: {currencySymbol}{goal.targetAmount.toLocaleString()}</p>
+                </Card>
+              );
+            })}
+          </div>
+        ) : (
+          <Card className="border-dashed border-2 bg-secondary/10 p-6 flex flex-col items-center justify-center text-center gap-2 rounded-2xl">
+            <Target className="h-8 w-8 text-muted-foreground" />
+            <p className="text-xs font-medium text-muted-foreground">No active goals found.</p>
+            <Button size="sm" variant="outline" onClick={() => router.push('/goals')} className="text-[10px] font-bold h-7 gap-1">
+              <Plus className="h-3 w-3" /> Start A Goal
+            </Button>
+          </Card>
+        )}
+      </section>
 
-      {/* RESTORED: Recent Activity Section */}
       <section>
         <div className="flex items-center justify-between mb-3 px-1">
           <h3 className="font-semibold">Recent Activity</h3>
@@ -465,7 +458,6 @@ export default function Dashboard() {
         )}
       </section>
 
-      {/* RESTORED: Quick Actions */}
       <div className="grid grid-cols-2 gap-4 mt-2">
         <button 
           onClick={() => router.push('/log')}
@@ -489,7 +481,6 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* Health Score Breakdown Modal */}
       <Dialog open={showScoreBreakdown} onOpenChange={setShowScoreBreakdown}>
         <DialogContent className="max-w-md rounded-2xl bg-card">
           <DialogHeader>
@@ -539,7 +530,6 @@ export default function Dashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* Approval Decision Modal */}
       <Dialog open={!!selectedApproval} onOpenChange={(open) => !open && setSelectedApproval(null)}>
         <DialogContent className="max-w-md rounded-2xl bg-card">
           <DialogHeader>
