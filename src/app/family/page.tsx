@@ -33,7 +33,6 @@ export default function FamilyManagement() {
   const { data: familyData, isLoading: isFamilyDataLoading } = useDoc(familyDocRef);
 
   // Fetch all user profiles that belong to this family.
-  // We use this to resolve names and avatars.
   const membersQuery = useMemoFirebase(() => {
     if (!userData?.familyId) return null;
     return query(
@@ -151,7 +150,6 @@ export default function FamilyManagement() {
     );
   }
 
-  // Use the members list from the family document as the primary source of truth.
   const membersList = Object.entries(familyData.members || {});
 
   return (
@@ -201,11 +199,9 @@ export default function FamilyManagement() {
         </div>
         <div className="space-y-3">
           {membersList.map(([memberId, role]) => {
-            // Find the full profile from our profiles collection fetch.
             const profile = memberProfiles?.find(p => p.id === memberId);
             const isMe = memberId === user?.uid;
             
-            // Resolve the best display name possible.
             const firstName = profile?.firstName || (isMe ? userData?.firstName : '');
             const lastName = profile?.lastName || (isMe ? userData?.lastName : '');
             const fullName = `${firstName} ${lastName}`.trim();
@@ -222,10 +218,10 @@ export default function FamilyManagement() {
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="text-sm font-bold flex items-center gap-2">
+                      <div className="text-sm font-bold flex items-center gap-2">
                         {displayName}
                         {isMe && <Badge variant="outline" className="text-[8px] h-4 py-0 px-1 font-bold border-primary text-primary">YOU</Badge>}
-                      </p>
+                      </div>
                       <div className="flex items-center gap-1">
                         {role === 'Admin' ? <ShieldCheck className="h-3 w-3 text-primary" /> : <Shield className="h-3 w-3 text-muted-foreground" />}
                         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter">{role as string}</span>
