@@ -368,7 +368,7 @@ export default function Dashboard() {
                     innerRadius={60}
                     outerRadius={80}
                   >
-                    {stsData.pieData.map((entry: { fill: string | undefined; }, index: any) => (
+                    {stsData.pieData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
                   </Pie>

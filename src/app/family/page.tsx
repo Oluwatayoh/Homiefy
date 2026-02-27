@@ -33,7 +33,7 @@ export default function FamilyManagement() {
   const { data: familyData, isLoading: isFamilyDataLoading } = useDoc(familyDocRef);
 
   // Fetch all user profiles in the family to display names.
-  // Security rules permit this read for members of the same family.
+  // Security rules permit this read for members of the same family (sharing familyId).
   const membersQuery = useMemoFirebase(() => {
     if (!userData?.familyId) return null;
     return query(
@@ -161,7 +161,7 @@ export default function FamilyManagement() {
       </header>
 
       {isAdmin && (
-        <Card className="border-none shadow-xl bg-accent text-white overflow-hidden">
+        <Card className="border-none shadow-xl bg-primary text-white overflow-hidden">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-bold uppercase tracking-wider text-white/80">Invite Members</CardTitle>
             <CardDescription className="text-white/70">Share this code to add family members.</CardDescription>

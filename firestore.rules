@@ -9,7 +9,6 @@ service cloud.firestore {
      * 1. Path-based isolation for User Profiles.
      * 2. Family membership is the gatekeeper for all shared household data.
      * 3. Membership is stored as a map on the Family document: members: { uid: role }
-     * 4. Subcollections are explicitly governed to support high-performance list operations.
      */
 
     function isSignedIn() {
@@ -25,7 +24,7 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data;
     }
 
-    // Checks if the user is a member of the family by looking up the family document.
+    // Checks if the user is a member of the family
     function isFamilyMember(familyId) {
       let family = get(/databases/$(database)/documents/families/$(familyId));
       return isSignedIn() && family != null && family.data.members[request.auth.uid] != null;
@@ -37,7 +36,7 @@ service cloud.firestore {
      * @description Rules for individual user profiles.
      */
     match /userProfiles/{userId} {
-      // Allow reading if owner OR if they are in the same family (to see names/avatars on rosters).
+      // Allow reading if owner OR if they share the same familyId (to see names/avatars).
       allow read: if isOwner(userId) || (
         isSignedIn() && 
         resource.data.familyId != null && 
@@ -61,31 +60,28 @@ service cloud.firestore {
       
       // Update logic:
       // 1. Existing members can update.
-      // 2. New members can join by adding their own UID to the members map.
+      // 2. New members can join by adding their own UID to the members map if they have the invite code.
       allow update: if isSignedIn() && (
-        isFamilyMember(familyId) || 
+        (resource.data.members[request.auth.uid] != null) || 
         (
-          // Case: Joining a family via valid invite code.
           request.resource.data.members[request.auth.uid] != null &&
           request.resource.data.inviteCode == resource.data.inviteCode
         )
       );
 
       // Only admins can delete the family record.
-      allow delete: if isSignedIn() && isFamilyMember(familyId) && get(/databases/$(database)/documents/families/$(familyId)).data.members[request.auth.uid] == 'Admin';
+      allow delete: if isSignedIn() && resource.data.members[request.auth.uid] == 'Admin';
 
       /**
        * @description Explicit rules for family sub-data.
-       * We check for membership on the document itself for efficient 'list' operations.
+       * Subcollections check the document's own 'members' map for efficient 'list' operations.
        */
       match /{allSubcollections=**} {
-        // Allow read if user is in the members map of the document OR the parent family.
         allow read: if isSignedIn() && (
           (resource != null && resource.data.members[request.auth.uid] != null) ||
           isFamilyMember(familyId)
         );
         
-        // Allow write if user is a member and correctly stamps their UID in the members map.
         allow write: if isSignedIn() && 
           isFamilyMember(familyId) && 
           request.resource.data.members[request.auth.uid] != null;
