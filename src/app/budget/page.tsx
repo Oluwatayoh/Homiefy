@@ -279,14 +279,16 @@ export default function BudgetManagement() {
               Rollover
             </Button>
           )}
-          <Button 
-            variant="outline" 
-            size="icon" 
-            onClick={() => setShowManageCategories(true)} 
-            className="rounded-xl h-9 w-9"
-          >
-            <Settings2 className="h-4 w-4" />
-          </Button>
+          {isAdmin && (
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={() => setShowManageCategories(true)} 
+              className="rounded-xl h-9 w-9"
+            >
+              <Settings2 className="h-4 w-4" />
+            </Button>
+          )}
           <div className="flex items-center gap-1 bg-card border rounded-xl p-1 shadow-sm">
             <Button variant="ghost" size="icon" onClick={() => navigateMonth(-1)} className="h-7 w-7 rounded-lg">
               <ChevronLeft className="h-4 w-4" />
