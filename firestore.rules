@@ -9,6 +9,7 @@ service cloud.firestore {
      * 1. Path-based isolation for User Profiles.
      * 2. Family membership is the gatekeeper for all shared household data.
      * 3. Membership is stored as a map on the Family document: members: { uid: role }
+     * 4. Documents in subcollections denormalize this members map for efficient list operations.
      */
 
     function isSignedIn() {
@@ -52,8 +53,8 @@ service cloud.firestore {
       // Basic family access.
       allow get: if isSignedIn();
       
-      // Allow listing families you belong to.
-      allow list: if isSignedIn() && resource.data.members[request.auth.uid] != null;
+      // Allow listing families. Filtered queries on membership or invite codes are permitted.
+      allow list: if isSignedIn();
       
       // Creation.
       allow create: if isSignedIn();
