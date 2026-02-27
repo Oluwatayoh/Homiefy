@@ -46,12 +46,13 @@ export default function TransactionHistory() {
   const currencySymbol = getCurrencySymbol(currencyCode);
 
   const txQuery = useMemoFirebase(() => {
-    if (!userData?.familyId) return null;
+    if (!userData?.familyId || !user) return null;
     return query(
       collection(db, 'families', userData.familyId, 'transactions'),
+      where(`members.${user.uid}`, '!=', null),
       orderBy('date', sortOrder)
     );
-  }, [userData?.familyId, db, sortOrder]);
+  }, [userData?.familyId, db, sortOrder, user]);
 
   const { data: transactions, isLoading } = useCollection(txQuery);
 
@@ -103,14 +104,14 @@ export default function TransactionHistory() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
             placeholder="Search description..." 
-            className="pl-10 h-11 rounded-xl bg-card"
+            className="pl-10 h-11 rounded-xl bg-card border-none shadow-sm"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
         <div className="flex gap-2">
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="flex-1 rounded-xl bg-card">
+            <SelectTrigger className="flex-1 rounded-xl bg-card border-none shadow-sm h-11">
               <Filter className="h-4 w-4 mr-2" />
               <SelectValue placeholder="Category" />
             </SelectTrigger>
@@ -122,7 +123,7 @@ export default function TransactionHistory() {
           <Button 
             variant="outline" 
             onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
-            className="rounded-xl px-3 bg-card"
+            className="rounded-xl px-3 bg-card border-none shadow-sm h-11"
           >
             <ArrowUpDown className="h-4 w-4 mr-2" />
             {sortOrder === 'desc' ? 'Newest' : 'Oldest'}
@@ -151,7 +152,7 @@ export default function TransactionHistory() {
               </div>
               <div className="text-right">
                 <p className="text-sm font-bold text-primary">{currencySymbol}{tx.amount?.toFixed(2)}</p>
-                <Badge variant="secondary" className="text-[8px] px-1 py-0 h-4 border-none">
+                <Badge variant="secondary" className="text-[8px] px-1 py-0 h-4 border-none font-bold uppercase tracking-wider">
                   {tx.category}
                 </Badge>
               </div>
@@ -160,7 +161,7 @@ export default function TransactionHistory() {
         ))}
         {filteredTransactions.length === 0 && (
           <div className="text-center py-20 text-muted-foreground">
-            <p>No transactions found matching your criteria.</p>
+            <p className="text-sm">No transactions found matching your criteria.</p>
           </div>
         )}
       </div>
@@ -211,7 +212,7 @@ export default function TransactionHistory() {
                   <>
                     <Button 
                       variant="destructive" 
-                      className="flex-1 rounded-xl text-white"
+                      className="flex-1 rounded-xl text-white font-bold"
                       onClick={() => handleDelete(selectedTx)}
                       disabled={isDeleting}
                     >
@@ -219,8 +220,8 @@ export default function TransactionHistory() {
                     </Button>
                     <Button 
                       variant="outline" 
-                      className="flex-1 rounded-xl bg-card"
-                      onClick={() => toast({ title: "Edit mode coming soon" })}
+                      className="flex-1 rounded-xl bg-card font-bold"
+                      onClick={() => toast({ title: "Edit functionality currently limited to deletion." })}
                     >
                       <Edit3 className="h-4 w-4 mr-2" /> Edit
                     </Button>

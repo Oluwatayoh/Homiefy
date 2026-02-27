@@ -9,6 +9,7 @@ service cloud.firestore {
      * 1. Path-based isolation for User Profiles.
      * 2. Family membership is the gatekeeper for all shared household data.
      * 3. Membership is stored as a map on the Family document: members: { uid: role }
+     * 4. Subcollections are explicitly governed to support high-performance list operations.
      */
 
     function isSignedIn() {
@@ -19,16 +20,15 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    // Helper to get the current user's profile data
+    function getMyProfile() {
+      return get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data;
+    }
+
     // Checks if the user is a member of the family by looking up the family document.
     function isFamilyMember(familyId) {
       let family = get(/databases/$(database)/documents/families/$(familyId));
       return isSignedIn() && family != null && family.data.members[request.auth.uid] != null;
-    }
-
-    // Checks if the user is in the same family as the resource.
-    function areInSameFamily(resourceFamilyId) {
-      let myProfile = get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data;
-      return isSignedIn() && resourceFamilyId != null && myProfile.familyId == resourceFamilyId;
     }
 
     // --- COLLECTION RULES ---
@@ -37,8 +37,12 @@ service cloud.firestore {
      * @description Rules for individual user profiles.
      */
     match /userProfiles/{userId} {
-      // Allow reading if owner OR if they are in the same family (to see names/avatars).
-      allow read: if isOwner(userId) || (isSignedIn() && areInSameFamily(resource.data.familyId));
+      // Allow reading if owner OR if they are in the same family (to see names/avatars on rosters).
+      allow read: if isOwner(userId) || (
+        isSignedIn() && 
+        resource.data.familyId != null && 
+        getMyProfile().familyId == resource.data.familyId
+      );
       allow write: if isOwner(userId);
     }
 
@@ -50,7 +54,7 @@ service cloud.firestore {
       allow get: if isSignedIn();
       
       // Allow listing families you belong to.
-      allow list: if isSignedIn() && isFamilyMember(familyId);
+      allow list: if isSignedIn() && resource.data.members[request.auth.uid] != null;
       
       // Creation.
       allow create: if isSignedIn();
@@ -61,22 +65,30 @@ service cloud.firestore {
       allow update: if isSignedIn() && (
         isFamilyMember(familyId) || 
         (
-          // Case: Joining a family. 
-          // They are adding their own UID to the members map.
+          // Case: Joining a family via valid invite code.
           request.resource.data.members[request.auth.uid] != null &&
           request.resource.data.inviteCode == resource.data.inviteCode
         )
       );
 
       // Only admins can delete the family record.
-      allow delete: if isSignedIn() && get(/databases/$(database)/documents/families/$(familyId)).data.members[request.auth.uid] == 'Admin';
+      allow delete: if isSignedIn() && isFamilyMember(familyId) && get(/databases/$(database)/documents/families/$(familyId)).data.members[request.auth.uid] == 'Admin';
 
       /**
        * @description Explicit rules for family sub-data.
-       * Subcollections in Firestore do not inherit permissions from parents.
+       * We check for membership on the document itself for efficient 'list' operations.
        */
       match /{allSubcollections=**} {
-        allow read, write: if isFamilyMember(familyId);
+        // Allow read if user is in the members map of the document OR the parent family.
+        allow read: if isSignedIn() && (
+          (resource != null && resource.data.members[request.auth.uid] != null) ||
+          isFamilyMember(familyId)
+        );
+        
+        // Allow write if user is a member and correctly stamps their UID in the members map.
+        allow write: if isSignedIn() && 
+          isFamilyMember(familyId) && 
+          request.resource.data.members[request.auth.uid] != null;
       }
     }
   }

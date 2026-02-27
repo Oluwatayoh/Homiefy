@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, UserMinus, Shield, ShieldCheck, Copy, AlertCircle, User, RefreshCcw } from 'lucide-react';
+import { Loader2, UserMinus, Shield, ShieldCheck, Copy, AlertCircle, User, RefreshCcw, UserCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -32,8 +32,8 @@ export default function FamilyManagement() {
 
   const { data: familyData, isLoading: isFamilyDataLoading } = useDoc(familyDocRef);
 
-  // Fetch all user profiles in the family to display their actual names
-  // This synchronized query satisfies security rules for household visibility
+  // Fetch all user profiles in the family to display names.
+  // Security rules permit this read for members of the same family.
   const membersQuery = useMemoFirebase(() => {
     if (!userData?.familyId) return null;
     return query(
@@ -196,25 +196,25 @@ export default function FamilyManagement() {
       <section className="space-y-3">
         <div className="flex items-center justify-between px-1">
           <h3 className="font-semibold">Family Members</h3>
-          <Badge variant="secondary" className="text-[10px]">{membersList.length}/10 MEMBERS</Badge>
+          <Badge variant="secondary" className="text-[10px] font-bold">{membersList.length}/10 MEMBERS</Badge>
         </div>
         <div className="space-y-3">
           {membersList.map(([memberId, role]) => {
             const profile = memberProfiles?.find(p => p.id === memberId);
             const isMe = memberId === user?.uid;
             
-            const displayName = profile 
-              ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || profile.displayName || profile.email || "Unnamed Member"
-              : (isMe ? (userData?.firstName ? `${userData.firstName} ${userData.lastName}` : "You") : "Loading...");
+            const firstName = profile?.firstName || (isMe ? userData?.firstName : '');
+            const lastName = profile?.lastName || (isMe ? userData?.lastName : '');
+            const displayName = `${firstName} ${lastName}`.trim() || profile?.email || "Unnamed Member";
 
             return (
               <Card key={memberId} className="border-none shadow-sm overflow-hidden bg-card">
                 <CardContent className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <Avatar className="h-10 w-10 border-2 border-primary/10">
-                      <AvatarImage src={profile?.photoUrl || userData?.photoUrl} />
-                      <AvatarFallback className="bg-secondary text-primary font-bold">
-                        {displayName?.[0]?.toUpperCase() || <User className="h-4 w-4" />}
+                    <Avatar className="h-12 w-12 border-2 border-primary/10">
+                      <AvatarImage src={profile?.photoUrl} />
+                      <AvatarFallback className="bg-secondary text-primary font-bold text-lg">
+                        {displayName?.[0]?.toUpperCase() || <User className="h-5 w-5" />}
                       </AvatarFallback>
                     </Avatar>
                     <div>
@@ -224,7 +224,7 @@ export default function FamilyManagement() {
                       </p>
                       <div className="flex items-center gap-1">
                         {role === 'Admin' ? <ShieldCheck className="h-3 w-3 text-primary" /> : <Shield className="h-3 w-3 text-muted-foreground" />}
-                        <span className="text-[10px] font-medium text-muted-foreground">{role as string}</span>
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter">{role as string}</span>
                       </div>
                     </div>
                   </div>
@@ -236,7 +236,7 @@ export default function FamilyManagement() {
                         onValueChange={(val) => handleRoleChange(memberId, val)}
                         disabled={isMe && adminCount <= 1}
                       >
-                        <SelectTrigger className="h-8 w-28 text-[10px] font-bold rounded-lg">
+                        <SelectTrigger className="h-9 w-28 text-[10px] font-bold rounded-lg bg-secondary/50 border-none">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -249,7 +249,7 @@ export default function FamilyManagement() {
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-lg"
                           onClick={() => handleRemoveMember(memberId)}
                         >
                           <UserMinus className="h-4 w-4" />
@@ -261,6 +261,9 @@ export default function FamilyManagement() {
               </Card>
             );
           })}
+          {isMembersLoading && membersList.map((_, i) => (
+            <Card key={i} className="border-none shadow-sm bg-card h-20 animate-pulse" />
+          ))}
         </div>
       </section>
     </div>
