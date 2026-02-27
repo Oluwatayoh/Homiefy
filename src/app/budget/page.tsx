@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc, updateDoc, setDoc, arrayUnion } from 'firebase/firestore';
+import { doc, updateDoc, setDoc, arrayUnion, getDoc } from 'firebase/firestore';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,7 +13,7 @@ import {
   Loader2, Info, CheckCircle2, AlertTriangle, Wand2, 
   ChevronLeft, ChevronRight, Calendar, PieChart, Plus, 
   Settings2, Home, Zap, ShoppingBasket, Car, Utensils, 
-  Film, Stethoscope, User, PiggyBank, ShieldAlert, Heart, Gift, Briefcase, Globe
+  Film, Stethoscope, User, PiggyBank, ShieldAlert, Heart, Gift, Briefcase, Globe, RefreshCcw, Copy
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
@@ -52,6 +52,7 @@ export default function BudgetManagement() {
   const [showManageCategories, setShowManageCategories] = useState(false);
   const [customCategoryName, setCustomCategoryName] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isRollingOver, setIsRollingOver] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -61,6 +62,13 @@ export default function BudgetManagement() {
   const monthId = useMemo(() => {
     if (!currentDate) return '';
     return currentDate.toISOString().slice(0, 7);
+  }, [currentDate]);
+
+  const prevMonthId = useMemo(() => {
+    if (!currentDate) return '';
+    const d = new Date(currentDate);
+    d.setMonth(d.getMonth() - 1);
+    return d.toISOString().slice(0, 7);
   }, [currentDate]);
 
   const isCurrentMonth = useMemo(() => {
@@ -94,34 +102,15 @@ export default function BudgetManagement() {
   const [income, setIncome] = useState<string>('');
   const [envelopes, setEnvelopes] = useState<any[]>([]);
 
-  // Effective categories for this family (presets + custom)
-  const familyCategories = useMemo(() => {
-    if (!familyData) return [];
-    const enabledPresets = PRESET_CATEGORIES.filter(p => 
-      !familyData.disabledCategories?.includes(p.id)
-    );
-    const customOnes = familyData.customCategories || [];
-    return [...enabledPresets, ...customOnes];
-  }, [familyData]);
-
   useEffect(() => {
     if (budgetData) {
       setIncome(budgetData.totalIncome?.toString() || '');
-      // Ensure we merge existing budget data with current family category structure
-      const mergedEnvelopes = familyCategories.map(cat => {
-        const existing = budgetData.envelopes?.find((e: any) => e.id === cat.id);
-        return {
-          ...cat,
-          allocated: existing?.allocated || 0,
-          spent: existing?.spent || 0
-        };
-      });
-      setEnvelopes(mergedEnvelopes);
+      setEnvelopes(budgetData.envelopes || []);
     } else {
       setIncome('');
-      setEnvelopes(familyCategories.map(cat => ({ ...cat, allocated: 0, spent: 0 })));
+      setEnvelopes([]);
     }
-  }, [budgetData, familyCategories]);
+  }, [budgetData]);
 
   const currencyCode = userData?.preferences?.currency || familyData?.currencyCode || 'NGN';
   const currencySymbol = getCurrencySymbol(currencyCode);
@@ -154,7 +143,7 @@ export default function BudgetManagement() {
     try {
       const data = {
         id: monthId,
-        totalIncome: parseFloat(income),
+        totalIncome: parseFloat(income) || 0,
         envelopes: envelopes,
         status: 'Active',
         members: familyData.members,
@@ -170,26 +159,45 @@ export default function BudgetManagement() {
     }
   };
 
-  const toggleCategory = async (catId: string, isPreset: boolean) => {
-    if (!familyDocRef || !isAdmin) return;
-    
+  const handleRollover = async () => {
+    if (!userData?.familyId || !isAdmin) return;
+    setIsRollingOver(true);
     try {
-      const disabled = familyData.disabledCategories || [];
-      if (disabled.includes(catId)) {
-        await updateDoc(familyDocRef, {
-          disabledCategories: disabled.filter(id => id !== catId)
-        });
-      } else {
-        await updateDoc(familyDocRef, {
-          disabledCategories: [...disabled, catId]
-        });
+      const prevBudgetRef = doc(db, 'families', userData.familyId, 'budgets', prevMonthId);
+      const prevSnap = await getDoc(prevBudgetRef);
+      
+      if (!prevSnap.exists()) {
+        toast({ variant: "destructive", title: "No Data", description: `No budget found for ${prevMonthId} to rollover.` });
+        return;
       }
+
+      const prevData = prevSnap.data();
+      setIncome(prevData.totalIncome?.toString() || '');
+      // Rollover copies the structure and allocation, but resets 'spent' to 0 for the new month
+      const newEnvelopes = (prevData.envelopes || []).map((e: any) => ({
+        ...e,
+        spent: 0
+      }));
+      setEnvelopes(newEnvelopes);
+      
+      toast({ title: "Rollover Successful", description: `Imported ${newEnvelopes.length} categories from ${prevMonthId}.` });
     } catch (e: any) {
-      toast({ variant: "destructive", title: "Update Failed", description: e.message });
+      toast({ variant: "destructive", title: "Rollover Failed", description: e.message });
+    } finally {
+      setIsRollingOver(false);
     }
   };
 
-  const addCustomCategory = async () => {
+  const toggleCategory = (cat: any) => {
+    const exists = envelopes.find(e => e.id === cat.id);
+    if (exists) {
+      setEnvelopes(prev => prev.filter(e => e.id !== cat.id));
+    } else {
+      setEnvelopes(prev => [...prev, { ...cat, allocated: 0, spent: 0 }]);
+    }
+  };
+
+  const addCustomCategoryToFamily = async () => {
     if (!familyDocRef || !isAdmin || !customCategoryName.trim()) return;
     
     setIsUpdating(true);
@@ -206,7 +214,7 @@ export default function BudgetManagement() {
       });
       
       setCustomCategoryName('');
-      toast({ title: "Category Created", description: `"${newCat.name}" added to your family.` });
+      toast({ title: "Category Created", description: `"${newCat.name}" is now available for your family.` });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Failed to add", description: e.message });
     } finally {
@@ -241,19 +249,31 @@ export default function BudgetManagement() {
           <p className="text-muted-foreground text-sm">Managing family resources.</p>
         </div>
         <div className="flex items-center gap-2">
+          {isAdmin && isCurrentMonth && envelopes.length === 0 && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleRollover} 
+              disabled={isRollingOver}
+              className="rounded-xl gap-2 text-[10px] font-bold h-9"
+            >
+              {isRollingOver ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCcw className="h-3 w-3" />}
+              Rollover
+            </Button>
+          )}
           <Button 
             variant="outline" 
             size="icon" 
             onClick={() => setShowManageCategories(true)} 
-            className="rounded-xl"
+            className="rounded-xl h-9 w-9"
           >
             <Settings2 className="h-4 w-4" />
           </Button>
           <div className="flex items-center gap-1 bg-card border rounded-xl p-1 shadow-sm">
-            <Button variant="ghost" size="icon" onClick={() => navigateMonth(-1)} className="h-8 w-8 rounded-lg">
+            <Button variant="ghost" size="icon" onClick={() => navigateMonth(-1)} className="h-7 w-7 rounded-lg">
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <div className="px-2 text-xs font-bold flex items-center gap-1">
+            <div className="px-2 text-[10px] font-bold flex items-center gap-1 min-w-[70px] justify-center">
               <Calendar className="h-3 w-3 text-primary" />
               {monthId}
             </div>
@@ -262,7 +282,7 @@ export default function BudgetManagement() {
               size="icon" 
               onClick={() => navigateMonth(1)} 
               disabled={isCurrentMonth}
-              className="h-8 w-8 rounded-lg"
+              className="h-7 w-7 rounded-lg"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
@@ -274,7 +294,7 @@ export default function BudgetManagement() {
         <div className="p-8 text-center bg-card rounded-2xl border shadow-sm space-y-4">
           <Calendar className="w-12 h-12 text-muted-foreground mx-auto" />
           <h2 className="font-bold">Future Budget Restricted</h2>
-          <p className="text-sm text-muted-foreground">You cannot create or view budgets for future periods according to governance rules.</p>
+          <p className="text-sm text-muted-foreground">You cannot view or edit budgets for future months.</p>
           <Button variant="outline" onClick={() => setCurrentDate(new Date())}>Return to Present</Button>
         </div>
       ) : (
@@ -396,8 +416,13 @@ export default function BudgetManagement() {
               {envelopes.length === 0 && (
                 <div className="p-12 text-center bg-secondary/10 border-dashed border-2 rounded-2xl">
                   <PieChart className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-                  <p className="text-sm text-muted-foreground font-medium">No active categories.</p>
-                  <Button variant="link" onClick={() => setShowManageCategories(true)} className="text-primary font-bold">Manage Categories</Button>
+                  <p className="text-sm text-muted-foreground font-medium">No active categories for {monthId}.</p>
+                  {isAdmin && (
+                    <div className="flex flex-col gap-2 mt-4">
+                       <Button variant="link" onClick={() => setShowManageCategories(true)} className="text-primary font-bold">Manage Categories</Button>
+                       <Button variant="outline" size="sm" onClick={handleRollover} disabled={isRollingOver} className="rounded-xl mx-auto">Rollover from {prevMonthId}</Button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -407,10 +432,10 @@ export default function BudgetManagement() {
             <Button 
               className="w-full h-14 rounded-xl text-lg font-bold shadow-xl mt-4"
               onClick={handleSaveBudget}
-              disabled={isUpdating || remainingIncome < 0 || parseFloat(income) <= 0}
+              disabled={isUpdating || remainingIncome < 0}
             >
               {isUpdating ? <Loader2 className="animate-spin mr-2" /> : <CheckCircle2 className="mr-2 h-5 w-5" />}
-              Update Budget
+              Save Budget Plan
             </Button>
           )}
         </>
@@ -420,8 +445,8 @@ export default function BudgetManagement() {
       <Dialog open={showManageCategories} onOpenChange={setShowManageCategories}>
         <DialogContent className="max-w-md max-h-[80vh] flex flex-col rounded-2xl">
           <DialogHeader>
-            <DialogTitle>Family Categories</DialogTitle>
-            <DialogDescription>Select presets or add custom ones for your household.</DialogDescription>
+            <DialogTitle>Month Categories</DialogTitle>
+            <DialogDescription>Select the active envelopes for {monthId}.</DialogDescription>
           </DialogHeader>
           
           <div className="flex-1 overflow-y-auto pr-2 py-4 space-y-6">
@@ -429,12 +454,12 @@ export default function BudgetManagement() {
               <h4 className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest px-1">Presets</h4>
               <div className="grid grid-cols-2 gap-2">
                 {PRESET_CATEGORIES.map(cat => {
-                  const isEnabled = !familyData?.disabledCategories?.includes(cat.id);
+                  const isEnabled = !!envelopes.find(e => e.id === cat.id);
                   const Icon = ICON_MAP[cat.icon];
                   return (
                     <button
                       key={cat.id}
-                      onClick={() => toggleCategory(cat.id, true)}
+                      onClick={() => toggleCategory(cat)}
                       disabled={!isAdmin}
                       className={cn(
                         "flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left",
@@ -452,34 +477,48 @@ export default function BudgetManagement() {
             </div>
 
             <div className="space-y-3">
-              <h4 className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest px-1">Custom Categories</h4>
+              <h4 className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest px-1">Family Custom Categories</h4>
               <div className="space-y-2">
-                {familyData?.customCategories?.map((cat: any) => (
-                  <div key={cat.id} className="flex items-center justify-between p-3 rounded-xl bg-secondary/30">
-                    <div className="flex items-center gap-3">
-                      <PieChart className="h-4 w-4 text-primary" />
-                      <span className="text-sm font-bold">{cat.name}</span>
-                    </div>
-                    <Badge variant="outline" className="text-[8px] font-bold">PRIVATE</Badge>
-                  </div>
-                ))}
+                {familyData?.customCategories?.map((cat: any) => {
+                  const isEnabled = !!envelopes.find(e => e.id === cat.id);
+                  return (
+                    <button
+                      key={cat.id}
+                      onClick={() => toggleCategory(cat)}
+                      disabled={!isAdmin}
+                      className={cn(
+                        "flex w-full items-center justify-between p-3 rounded-xl border-2 transition-all",
+                        isEnabled ? "border-primary bg-primary/5" : "border-secondary bg-secondary/30"
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <PieChart className={cn("h-4 w-4", isEnabled ? "text-primary" : "text-muted-foreground")} />
+                        <span className={cn("text-sm font-bold", isEnabled ? "text-primary" : "text-muted-foreground")}>{cat.name}</span>
+                      </div>
+                      {isEnabled && <CheckCircle2 className="h-4 w-4 text-primary" />}
+                    </button>
+                  );
+                })}
                 
                 {isAdmin && (
-                  <div className="flex gap-2 mt-4">
-                    <Input 
-                      placeholder="Custom name..." 
-                      value={customCategoryName}
-                      onChange={(e) => setCustomCategoryName(e.target.value)}
-                      className="rounded-xl"
-                    />
-                    <Button 
-                      size="icon" 
-                      onClick={addCustomCategory} 
-                      disabled={isUpdating || !customCategoryName.trim()}
-                      className="rounded-xl shrink-0"
-                    >
-                      {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                    </Button>
+                  <div className="space-y-2 pt-4 border-t">
+                    <p className="text-[9px] font-bold text-muted-foreground uppercase">Create New Custom Category</p>
+                    <div className="flex gap-2">
+                      <Input 
+                        placeholder="e.g. Pet Care, Hobbies" 
+                        value={customCategoryName}
+                        onChange={(e) => setCustomCategoryName(e.target.value)}
+                        className="rounded-xl h-10 text-xs"
+                      />
+                      <Button 
+                        size="icon" 
+                        onClick={addCustomCategoryToFamily} 
+                        disabled={isUpdating || !customCategoryName.trim()}
+                        className="rounded-xl shrink-0 h-10 w-10"
+                      >
+                        {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -487,7 +526,7 @@ export default function BudgetManagement() {
           </div>
           
           <DialogFooter>
-            <Button className="w-full rounded-xl" onClick={() => setShowManageCategories(false)}>Done</Button>
+            <Button className="w-full rounded-xl" onClick={() => setShowManageCategories(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
