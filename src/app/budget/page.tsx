@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -107,6 +108,7 @@ export default function BudgetManagement() {
       setIncome(budgetData.totalIncome?.toString() || '');
       setEnvelopes(budgetData.envelopes || []);
     } else {
+      // RESET: If no data for this month, start with empty categories
       setIncome('');
       setEnvelopes([]);
     }

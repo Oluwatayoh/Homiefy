@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "UserProfile": {
@@ -85,6 +86,18 @@
           "type": "string",
           "description": "Reference to the UserProfile entity who holds the primary administrative role for this family. (Relationship: UserProfile 1:N Family)"
         },
+        "customCategories": {
+          "type": "array",
+          "description": "A list of custom spending categories created by this family.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "icon": { "type": "string" }
+            }
+          }
+        },
         "createdAt": {
           "type": "string",
           "description": "Timestamp indicating when the family entity was created.",
@@ -122,7 +135,7 @@
           "schema": {
             "$ref": "#/backend/entities/UserProfile"
           },
-          "description": "Stores individual user profile data. The document ID (`userId`) MUST match the authenticated user's UID (`request.auth.uid`). This collection implements path-based ownership for private user data.",
+          "description": "Stores individual user profile data.",
           "params": [
             {
               "name": "userId",
@@ -138,12 +151,22 @@
           "schema": {
             "$ref": "#/backend/entities/Family"
           },
-          "description": "Stores details for each family unit. This document includes a denormalized 'members' map (e.g., `{ 'uid1': 'Admin', 'uid2': 'Parent' }`) which defines all members of the family and their respective roles, critical for authorization independence and QAP-compliant list operations. The 'adminUserId' field identifies the primary administrator, but the 'members' map is the authoritative source for current roles.",
+          "description": "Stores details for each family unit.",
           "params": [
             {
               "name": "familyId",
               "description": "The unique ID for a specific family unit."
             }
+          ]
+        }
+      },
+      {
+        "path": "/families/{familyId}/budgets/{monthId}",
+        "definition": {
+          "description": "Stores monthly budget configurations and envelope balances for a family.",
+          "params": [
+            { "name": "familyId" },
+            { "name": "monthId", "description": "ISO 8601 month string (e.g., '2023-10')." }
           ]
         }
       }
