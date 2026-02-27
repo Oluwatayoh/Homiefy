@@ -242,7 +242,9 @@ export default function Dashboard() {
     <div className="flex flex-col gap-6 p-6 pb-24 animate-in fade-in duration-500 bg-background min-h-screen">
       <header className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold font-headline">{userData?.familyId ? "My Household" : "Welcome"}</h1>
+          <h1 className="text-2xl font-bold font-headline">
+            {familyData?.name || (userData?.familyId ? "My Household" : "Welcome")}
+          </h1>
           <p className="text-muted-foreground text-sm">Family Dashboard</p>
         </div>
         <div className="flex -space-x-2">
