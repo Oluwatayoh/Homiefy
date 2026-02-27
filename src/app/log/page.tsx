@@ -9,8 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Loader2, Plus, Smile, Meh, Frown, Camera, X, ShieldAlert } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -175,7 +173,7 @@ export default function RapidLog() {
       
       toast({
         title: "Transaction Logged",
-        description: `${currencySymbol}${amount} recorded for ${category}.`,
+        description: `${currencySymbol}${numericAmount.toLocaleString()} recorded for ${category}.`,
       });
 
       setTimeout(() => router.push('/dashboard'), 1500);
@@ -337,7 +335,7 @@ export default function RapidLog() {
             <ShieldAlert className="h-5 w-5 text-amber-600 shrink-0" />
             <div>
               <p className="text-xs font-bold text-amber-900 dark:text-amber-400">Approval Required</p>
-              <p className="text-[10px] text-amber-700 dark:text-amber-500">This amount exceeds your family spending threshold ({currencySymbol}{threshold}).</p>
+              <p className="text-[10px] text-amber-700 dark:text-amber-500">This amount exceeds your family spending threshold ({currencySymbol}{threshold.toLocaleString()}).</p>
             </div>
           </div>
         )}
@@ -390,11 +388,10 @@ export default function RapidLog() {
           <div className="flex-1 relative bg-neutral-900 flex items-center justify-center">
             <video ref={videoRef} className="w-full h-full object-contain" autoPlay muted playsInline />
             {hasCameraPermission === false && (
-              <Alert variant="destructive" className="absolute mx-6">
+              <div className="absolute mx-6 p-4 rounded-xl bg-red-500 text-white flex gap-2">
                 <ShieldAlert className="h-4 w-4" />
-                <AlertTitle>Camera Access Required</AlertTitle>
-                <AlertDescription>Please allow camera access in settings.</AlertDescription>
-              </Alert>
+                <p className="text-sm font-bold">Camera Access Required. Please allow camera access in settings.</p>
+              </div>
             )}
           </div>
           <div className="p-8 bg-black flex justify-center">

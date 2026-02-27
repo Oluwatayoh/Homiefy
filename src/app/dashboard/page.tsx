@@ -64,7 +64,6 @@ export default function Dashboard() {
 
   const isStaff = userData?.role === 'Admin' || userData?.role === 'Co-Manager';
 
-  // Simplified query for open rules
   const txQuery = useMemoFirebase(() => {
     if (!userData?.familyId) return null;
     return query(
@@ -76,7 +75,6 @@ export default function Dashboard() {
 
   const { data: recentTxs, isLoading: isTxsLoading } = useCollection(txQuery);
 
-  // Simplified query for open rules
   const goalsQuery = useMemoFirebase(() => {
     if (!userData?.familyId) return null;
     return query(
@@ -99,7 +97,6 @@ export default function Dashboard() {
 
   const { data: recentDecisions } = useCollection(decisionsQuery);
 
-  // Simplified query for open rules
   const approvalsQuery = useMemoFirebase(() => {
     if (!userData?.familyId) return null;
     return query(
@@ -112,7 +109,6 @@ export default function Dashboard() {
 
   const filteredApprovals = useMemo(() => {
     if (!pendingApprovals || !user) return [];
-    // Only show pending items
     const pending = pendingApprovals.filter(a => a.status === 'Pending');
     if (isStaff) return pending;
     return pending.filter(a => a.requesterId === user.uid);
@@ -276,7 +272,7 @@ export default function Dashboard() {
           <CardContent className="pt-8">
             <p className="text-white/80 text-sm font-medium">Safe to spend today</p>
             <div className="flex items-baseline gap-2 mt-1">
-              <h2 className="text-5xl font-bold tracking-tight">{currencySymbol}{stsData.amount.toFixed(2)}</h2>
+              <h2 className="text-5xl font-bold tracking-tight">{currencySymbol}{stsData.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h2>
             </div>
             <div className="mt-4 flex items-center gap-2">
               {stsData.status === 'green' && (
@@ -365,7 +361,7 @@ export default function Dashboard() {
                     </div>
                     <div>
                       <p className="text-xs font-bold">{req.transactionData?.description || req.transactionData?.category}</p>
-                      <p className="text-[10px] text-muted-foreground">{req.requesterName} • {currencySymbol}{req.transactionData?.amount?.toFixed(2)}</p>
+                      <p className="text-[10px] text-muted-foreground">{req.requesterName} • {currencySymbol}{req.transactionData?.amount?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                     </div>
                   </div>
                   <Badge variant="outline" className="text-[8px] border-amber-300 text-amber-700 dark:text-amber-400">REVIEW</Badge>
@@ -440,7 +436,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs font-bold text-primary">{currencySymbol}{tx.amount.toFixed(2)}</p>
+                    <p className="text-xs font-bold text-primary">{currencySymbol}{tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                     <p className="text-[8px] text-muted-foreground uppercase font-bold">{tx.category}</p>
                   </div>
                 </CardContent>
@@ -473,7 +469,7 @@ export default function Dashboard() {
           onClick={() => router.push('/pre-spend')}
           className="p-4 rounded-2xl bg-card shadow-sm border border-transparent hover:border-accent transition-all text-left group"
         >
-          <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-600 flex items-center justify-center mb-3 group-hover:bg-amber-600 group-hover:text-white transition-colors">
+          <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-950/40 text-amber-600 flex items-center justify-center mb-3 group-hover:bg-amber-600 group-hover:text-white transition-colors">
             <Sparkles className="h-6 w-6" />
           </div>
           <p className="font-bold text-sm">Pre-Spend</p>
@@ -543,7 +539,7 @@ export default function Dashboard() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 rounded-xl bg-secondary/30">
                   <p className="text-[10px] font-bold uppercase text-muted-foreground">Amount</p>
-                  <p className="text-xl font-bold">{currencySymbol}{selectedApproval.transactionData?.amount?.toFixed(2)}</p>
+                  <p className="text-xl font-bold">{currencySymbol}{selectedApproval.transactionData?.amount?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 </div>
                 <div className="p-3 rounded-xl bg-secondary/30">
                   <p className="text-[10px] font-bold uppercase text-muted-foreground">Category</p>

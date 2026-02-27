@@ -60,7 +60,6 @@ export default function PreSpendTool() {
 
   const { data: budgetData } = useDoc(budgetDocRef);
 
-  // Simplified query for open rules
   const goalsQuery = useMemoFirebase(() => {
     if (!userData?.familyId) return null;
     return query(
@@ -286,7 +285,7 @@ export default function PreSpendTool() {
                 </div>
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold uppercase text-muted-foreground">Daily STS After</p>
-                  <p className="text-lg font-bold text-primary">{currencySymbol}{result.budgetImpactDetails.newSafeToSpendDaily.toFixed(2)}</p>
+                  <p className="text-lg font-bold text-primary">{currencySymbol}{result.budgetImpactDetails.newSafeToSpendDaily.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 </div>
               </div>
 

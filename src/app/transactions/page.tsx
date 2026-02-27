@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
-import { doc, collection, query, orderBy, deleteDoc, where } from 'firebase/firestore';
+import { doc, collection, query, orderBy, deleteDoc } from 'firebase/firestore';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Loader2, Search, Filter, ArrowUpDown, Trash2, Edit3, User, Tag, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
 import { getCurrencySymbol } from '@/lib/currency';
 
 export default function TransactionHistory() {
@@ -150,7 +149,7 @@ export default function TransactionHistory() {
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-sm font-bold text-primary">{currencySymbol}{tx.amount?.toFixed(2)}</p>
+                <p className="text-sm font-bold text-primary">{currencySymbol}{tx.amount?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 <Badge variant="secondary" className="text-[8px] px-1 py-0 h-4 border-none font-bold uppercase tracking-wider">
                   {tx.category}
                 </Badge>
@@ -179,7 +178,7 @@ export default function TransactionHistory() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 rounded-xl bg-secondary/30 border">
                   <p className="text-[10px] font-bold uppercase text-muted-foreground">Amount</p>
-                  <p className="text-xl font-bold">{currencySymbol}{selectedTx.amount?.toFixed(2)}</p>
+                  <p className="text-xl font-bold">{currencySymbol}{selectedTx.amount?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 </div>
                 <div className="p-3 rounded-xl bg-secondary/30 border">
                   <p className="text-[10px] font-bold uppercase text-muted-foreground">Category</p>

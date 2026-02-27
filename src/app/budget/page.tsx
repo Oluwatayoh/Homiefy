@@ -10,10 +10,10 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { 
-  Loader2, Info, CheckCircle2, AlertTriangle, Wand2, 
+  Loader2, CheckCircle2, AlertTriangle, 
   ChevronLeft, ChevronRight, Calendar, PieChart, Plus, 
   Settings2, Home, Zap, ShoppingBasket, Car, Utensils, 
-  Film, Stethoscope, User, PiggyBank, ShieldAlert, Heart, Gift, Briefcase, Globe, RefreshCcw, Copy
+  Film, Stethoscope, User, PiggyBank, ShieldAlert, Heart, Gift, Briefcase, Globe, RefreshCcw
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
@@ -333,12 +333,12 @@ export default function BudgetManagement() {
               <div className="grid grid-cols-2 gap-4 pt-2">
                 <div>
                   <p className="text-[10px] font-bold uppercase text-white/70">Total Spent</p>
-                  <p className="text-lg font-bold">{currencySymbol}{totalSpent.toFixed(2)}</p>
+                  <p className="text-lg font-bold">{currencySymbol}{totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 </div>
                 <div>
                   <p className="text-[10px] font-bold uppercase text-white/70">Remaining</p>
                   <p className={cn("text-lg font-bold", remainingIncome < 0 ? "text-red-300" : "text-white")}>
-                    {currencySymbol}{remainingIncome.toFixed(2)}
+                    {currencySymbol}{remainingIncome.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                 </div>
               </div>
@@ -383,11 +383,11 @@ export default function BudgetManagement() {
                             </h4>
                             <div className="flex items-center gap-2 mt-0.5">
                               <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">
-                                {currencySymbol}{env.spent.toFixed(0)} spent
+                                {currencySymbol}{env.spent.toLocaleString()} spent
                               </span>
                               <span className="text-[10px] text-muted-foreground/30">•</span>
                               <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">
-                                {currencySymbol}{(env.allocated - env.spent).toFixed(0)} left
+                                {currencySymbol}{(env.allocated - env.spent).toLocaleString()} left
                               </span>
                             </div>
                           </div>
@@ -404,7 +404,7 @@ export default function BudgetManagement() {
                           </div>
                         ) : (
                           <div className="text-right">
-                            <p className="text-sm font-bold">{currencySymbol}{env.allocated.toFixed(0)}</p>
+                            <p className="text-sm font-bold">{currencySymbol}{env.allocated.toLocaleString()}</p>
                             <p className="text-[10px] text-muted-foreground font-bold uppercase">Budget</p>
                           </div>
                         )}
