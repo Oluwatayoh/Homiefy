@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Target, Calendar, TrendingUp, Plus, Loader2, Sparkles, Goal as GoalIcon, PlusCircle, PiggyBank } from 'lucide-react';
+import { Target, Calendar, TrendingUp, Plus, Loader2, Sparkles, Goal as GoalIcon, PlusCircle, PiggyBank, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { getCurrencySymbol } from '@/lib/currency';
 
@@ -98,7 +98,7 @@ export default function GoalsPage() {
         updatedAt: new Date().toISOString()
       });
 
-      toast({ title: "Contribution Added", description: `You added ${currencySymbol}${contributionAmount} to ${showContribute.name}!` });
+      toast({ title: "Contribution Added", description: `You added ${currencySymbol}${parseFloat(contributionAmount).toLocaleString()} to ${showContribute.name}!` });
       setShowContribute(null);
       setContributionAmount('');
     } catch (e: any) {
@@ -114,13 +114,22 @@ export default function GoalsPage() {
     <div className="p-6 flex flex-col gap-6 pb-24 animate-in fade-in duration-500">
       <header className="flex justify-between items-end">
         <div>
-          <h1 className="text-2xl font-bold font-headline">Family Goals</h1>
-          <p className="text-muted-foreground text-sm">Aligning for the future.</p>
+          <h1 className="text-2xl font-bold font-headline">Saving Targets</h1>
+          <p className="text-muted-foreground text-sm flex items-center gap-1">
+             Long-term family goals.
+          </p>
         </div>
         <Button onClick={() => setShowAddGoal(true)} size="sm" className="h-10 w-10 rounded-full bg-accent shadow-lg">
           <Plus className="h-6 w-6" />
         </Button>
       </header>
+
+      <div className="p-4 rounded-xl bg-secondary/20 border border-secondary/30 flex items-start gap-3">
+        <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+        <p className="text-[10px] leading-relaxed text-muted-foreground font-medium italic">
+          Unlike monthly budgets, <strong>Goals</strong> are long-term targets you save for across multiple months until completed.
+        </p>
+      </div>
 
       <div className="space-y-6">
         {isLoading ? (
@@ -151,8 +160,8 @@ export default function GoalsPage() {
                     
                     <div className="mt-8 mb-4">
                       <div className="flex justify-between text-sm font-bold mb-2">
-                        <span>{currencySymbol}{goal.currentAmount.toLocaleString()}</span>
-                        <span className="text-muted-foreground">{currencySymbol}{goal.targetAmount.toLocaleString()}</span>
+                        <span>{currencySymbol}{goal.currentAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span className="text-muted-foreground">{currencySymbol}{goal.targetAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
                       <Progress value={percent} className="h-3 bg-secondary" />
                     </div>
@@ -174,7 +183,7 @@ export default function GoalsPage() {
                      <div className="w-px bg-border h-full" />
                      <div className="text-center">
                        <p className="text-[10px] uppercase font-bold text-muted-foreground">Remaining</p>
-                       <p className="font-bold text-primary">{currencySymbol}{Math.max(0, goal.targetAmount - goal.currentAmount).toLocaleString()}</p>
+                       <p className="font-bold text-primary">{currencySymbol}{Math.max(0, goal.targetAmount - goal.currentAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                      </div>
                   </div>
                 </CardContent>
@@ -187,7 +196,7 @@ export default function GoalsPage() {
               <GoalIcon className="h-8 w-8 text-muted-foreground" />
             </div>
             <div>
-              <h3 className="font-bold text-lg">No Financial Goals</h3>
+              <h3 className="font-bold text-lg">No Saving Targets</h3>
               <p className="text-sm text-muted-foreground mt-1">
                 Start setting shared family goals to build your wealth together.
               </p>

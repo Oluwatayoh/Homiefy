@@ -13,7 +13,8 @@ import {
   Loader2, CheckCircle2, AlertTriangle, 
   ChevronLeft, ChevronRight, Calendar, PieChart, Plus, 
   Settings2, Home, Zap, ShoppingBasket, Car, Utensils, 
-  Film, Stethoscope, User, PiggyBank, ShieldAlert, Heart, Gift, Briefcase, Globe, RefreshCcw
+  Film, Stethoscope, User, PiggyBank, ShieldAlert, Heart, Gift, Briefcase, Globe, RefreshCcw,
+  Info
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
@@ -256,8 +257,8 @@ export default function BudgetManagement() {
     <div className="p-6 pb-24 flex flex-col gap-6">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold font-headline">Budget Explorer</h1>
-          <p className="text-muted-foreground text-sm">Managing family resources.</p>
+          <h1 className="text-2xl font-bold font-headline">Spending Plan</h1>
+          <p className="text-muted-foreground text-sm">Monthly budget envelopes.</p>
         </div>
         <div className="flex items-center gap-2">
           {isAdmin && isCurrentMonth && envelopes.length === 0 && (
@@ -354,8 +355,13 @@ export default function BudgetManagement() {
 
           <section className="space-y-4">
             <div className="flex items-center justify-between px-1">
-              <h3 className="font-semibold">Categories</h3>
-              <Badge variant="outline" className="text-[10px] font-bold">{envelopes.length} ACTIVE</Badge>
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold">Categories</h3>
+                <Badge variant="outline" className="text-[10px] font-bold">{envelopes.length} ACTIVE</Badge>
+              </div>
+              <p className="text-[10px] text-muted-foreground flex items-center gap-1 font-medium">
+                <Info className="h-3 w-3" /> Monthly spending limits
+              </p>
             </div>
 
             <div className="space-y-3">
@@ -383,11 +389,11 @@ export default function BudgetManagement() {
                             </h4>
                             <div className="flex items-center gap-2 mt-0.5">
                               <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">
-                                {currencySymbol}{env.spent.toLocaleString()} spent
+                                {currencySymbol}{env.spent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} spent
                               </span>
                               <span className="text-[10px] text-muted-foreground/30">•</span>
                               <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">
-                                {currencySymbol}{(env.allocated - env.spent).toLocaleString()} left
+                                {currencySymbol}{(env.allocated - env.spent).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} left
                               </span>
                             </div>
                           </div>
@@ -404,7 +410,7 @@ export default function BudgetManagement() {
                           </div>
                         ) : (
                           <div className="text-right">
-                            <p className="text-sm font-bold">{currencySymbol}{env.allocated.toLocaleString()}</p>
+                            <p className="text-sm font-bold">{currencySymbol}{env.allocated.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                             <p className="text-[10px] text-muted-foreground font-bold uppercase">Budget</p>
                           </div>
                         )}
