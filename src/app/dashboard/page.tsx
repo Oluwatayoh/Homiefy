@@ -69,7 +69,6 @@ export default function Dashboard() {
     if (!userData?.familyId || !user) return null;
     return query(
       collection(db, 'families', userData.familyId, 'transactions'),
-      where(`members.${user.uid}`, '!=', null),
       orderBy('date', 'desc'),
       limit(5)
     );
@@ -81,7 +80,6 @@ export default function Dashboard() {
     if (!userData?.familyId || !user) return null;
     return query(
       collection(db, 'families', userData.familyId, 'goals'),
-      where(`members.${user.uid}`, '!=', null),
       orderBy('createdAt', 'desc'),
       limit(3)
     );
@@ -93,7 +91,6 @@ export default function Dashboard() {
     if (!userData?.familyId || !user) return null;
     return query(
       collection(db, 'families', userData.familyId, 'decisions'),
-      where(`members.${user.uid}`, '!=', null),
       orderBy('timestamp', 'desc'),
       limit(10)
     );
@@ -105,7 +102,6 @@ export default function Dashboard() {
     if (!userData?.familyId || !user) return null;
     return query(
       collection(db, 'families', userData.familyId, 'approvals'),
-      where(`members.${user.uid}`, '!=', null),
       where('status', '==', 'Pending'),
       orderBy('requestedAt', 'desc')
     );
