@@ -2,30 +2,44 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, updateDoc, setDoc, arrayUnion } from 'firebase/firestore';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Loader2, Info, CheckCircle2, AlertTriangle, Wand2, ChevronLeft, ChevronRight, Calendar, PieChart } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { 
+  Loader2, Info, CheckCircle2, AlertTriangle, Wand2, 
+  ChevronLeft, ChevronRight, Calendar, PieChart, Plus, 
+  Settings2, Home, Zap, ShoppingBasket, Car, Utensils, 
+  Film, Stethoscope, User, PiggyBank, ShieldAlert, Heart, Gift, Briefcase, Globe
+} from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { getCurrencySymbol } from '@/lib/currency';
 
-const DEFAULT_ENVELOPES = [
-  { id: 'housing', name: 'Housing', icon: 'Home', allocated: 0 },
-  { id: 'utilities', name: 'Utilities', icon: 'Zap', allocated: 0 },
-  { id: 'groceries', name: 'Groceries', icon: 'ShoppingBasket', allocated: 0 },
-  { id: 'transport', name: 'Transportation', icon: 'Car', allocated: 0 },
-  { id: 'dining', name: 'Dining Out', icon: 'Utensils', allocated: 0 },
-  { id: 'entertainment', name: 'Entertainment', icon: 'Film', allocated: 0 },
-  { id: 'healthcare', name: 'Healthcare', icon: 'Stethoscope', allocated: 0 },
-  { id: 'personal', name: 'Personal Care', icon: 'User', allocated: 0 },
-  { id: 'savings', name: 'Savings', icon: 'PiggyBank', allocated: 0 },
-  { id: 'emergency', name: 'Emergency Fund', icon: 'ShieldAlert', allocated: 0 },
+const PRESET_CATEGORIES = [
+  { id: 'housing', name: 'Housing', icon: 'Home' },
+  { id: 'utilities', name: 'Utilities', icon: 'Zap' },
+  { id: 'groceries', name: 'Groceries', icon: 'ShoppingBasket' },
+  { id: 'transport', name: 'Transportation', icon: 'Car' },
+  { id: 'dining', name: 'Dining Out', icon: 'Utensils' },
+  { id: 'entertainment', name: 'Entertainment', icon: 'Film' },
+  { id: 'healthcare', name: 'Healthcare', icon: 'Stethoscope' },
+  { id: 'personal', name: 'Personal Care', icon: 'User' },
+  { id: 'savings', name: 'Savings', icon: 'PiggyBank' },
+  { id: 'emergency', name: 'Emergency Fund', icon: 'ShieldAlert' },
+  { id: 'education', name: 'Education', icon: 'Briefcase' },
+  { id: 'charity', name: 'Charity', icon: 'Heart' },
+  { id: 'gifts', name: 'Gifts', icon: 'Gift' },
+  { id: 'travel', name: 'Travel', icon: 'Globe' },
 ];
+
+const ICON_MAP: Record<string, any> = {
+  Home, Zap, ShoppingBasket, Car, Utensils, Film, Stethoscope, User, PiggyBank, ShieldAlert, Heart, Gift, Briefcase, Globe, PieChart
+};
 
 export default function BudgetManagement() {
   const { user, isUserLoading } = useUser();
@@ -35,6 +49,9 @@ export default function BudgetManagement() {
 
   const [mounted, setMounted] = useState(false);
   const [currentDate, setCurrentDate] = useState<Date | null>(null);
+  const [showManageCategories, setShowManageCategories] = useState(false);
+  const [customCategoryName, setCustomCategoryName] = useState('');
+  const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -56,10 +73,6 @@ export default function BudgetManagement() {
     return monthId > new Date().toISOString().slice(0, 7);
   }, [mounted, monthId]);
 
-  const [income, setIncome] = useState<string>('');
-  const [envelopes, setEnvelopes] = useState(DEFAULT_ENVELOPES.map(e => ({ ...e, spent: 0 })));
-  const [isUpdating, setIsUpdating] = useState(false);
-
   const userDocRef = useMemoFirebase(() => {
     return user ? doc(db, 'userProfiles', user.uid) : null;
   }, [user, db]);
@@ -72,24 +85,46 @@ export default function BudgetManagement() {
 
   const { data: familyData } = useDoc(familyDocRef);
 
-  const currencyCode = userData?.preferences?.currency || familyData?.currencyCode || 'NGN';
-  const currencySymbol = getCurrencySymbol(currencyCode);
-
   const budgetDocRef = useMemoFirebase(() => {
     return userData?.familyId && monthId ? doc(db, 'families', userData.familyId, 'budgets', monthId) : null;
   }, [userData?.familyId, db, monthId]);
 
   const { data: budgetData, isLoading: isBudgetLoading } = useDoc(budgetDocRef);
 
+  const [income, setIncome] = useState<string>('');
+  const [envelopes, setEnvelopes] = useState<any[]>([]);
+
+  // Effective categories for this family (presets + custom)
+  const familyCategories = useMemo(() => {
+    if (!familyData) return [];
+    const enabledPresets = PRESET_CATEGORIES.filter(p => 
+      !familyData.disabledCategories?.includes(p.id)
+    );
+    const customOnes = familyData.customCategories || [];
+    return [...enabledPresets, ...customOnes];
+  }, [familyData]);
+
   useEffect(() => {
     if (budgetData) {
       setIncome(budgetData.totalIncome?.toString() || '');
-      setEnvelopes(budgetData.envelopes || DEFAULT_ENVELOPES.map(e => ({ ...e, spent: 0 })));
+      // Ensure we merge existing budget data with current family category structure
+      const mergedEnvelopes = familyCategories.map(cat => {
+        const existing = budgetData.envelopes?.find((e: any) => e.id === cat.id);
+        return {
+          ...cat,
+          allocated: existing?.allocated || 0,
+          spent: existing?.spent || 0
+        };
+      });
+      setEnvelopes(mergedEnvelopes);
     } else {
       setIncome('');
-      setEnvelopes(DEFAULT_ENVELOPES.map(e => ({ ...e, spent: 0 })));
+      setEnvelopes(familyCategories.map(cat => ({ ...cat, allocated: 0, spent: 0 })));
     }
-  }, [budgetData]);
+  }, [budgetData, familyCategories]);
+
+  const currencyCode = userData?.preferences?.currency || familyData?.currencyCode || 'NGN';
+  const currencySymbol = getCurrencySymbol(currencyCode);
 
   const totalAllocated = envelopes.reduce((sum, e) => sum + (e.allocated || 0), 0);
   const totalSpent = envelopes.reduce((sum, e) => sum + (e.spent || 0), 0);
@@ -101,34 +136,6 @@ export default function BudgetManagement() {
     const nextDate = new Date(currentDate);
     nextDate.setMonth(currentDate.getMonth() + direction);
     setCurrentDate(nextDate);
-  };
-
-  const apply503020 = () => {
-    const inc = parseFloat(income);
-    if (isNaN(inc) || inc <= 0) {
-      toast({ variant: "destructive", title: "Invalid Income", description: "Please enter a valid monthly income first." });
-      return;
-    }
-
-    const needs = inc * 0.5;
-    const wants = inc * 0.3;
-    const savings = inc * 0.2;
-
-    const updated = envelopes.map(e => {
-      if (['housing', 'utilities', 'groceries', 'transport', 'healthcare'].includes(e.id)) {
-        return { ...e, allocated: needs / 5 };
-      }
-      if (['dining', 'entertainment', 'personal'].includes(e.id)) {
-        return { ...e, allocated: wants / 3 };
-      }
-      if (['savings', 'emergency'].includes(e.id)) {
-        return { ...e, allocated: savings / 2 };
-      }
-      return e;
-    });
-
-    setEnvelopes(updated);
-    toast({ title: "Rule Applied", description: "50/30/20 split applied to envelopes." });
   };
 
   const handleUpdateEnvelope = (id: string, value: string) => {
@@ -163,6 +170,50 @@ export default function BudgetManagement() {
     }
   };
 
+  const toggleCategory = async (catId: string, isPreset: boolean) => {
+    if (!familyDocRef || !isAdmin) return;
+    
+    try {
+      const disabled = familyData.disabledCategories || [];
+      if (disabled.includes(catId)) {
+        await updateDoc(familyDocRef, {
+          disabledCategories: disabled.filter(id => id !== catId)
+        });
+      } else {
+        await updateDoc(familyDocRef, {
+          disabledCategories: [...disabled, catId]
+        });
+      }
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Update Failed", description: e.message });
+    }
+  };
+
+  const addCustomCategory = async () => {
+    if (!familyDocRef || !isAdmin || !customCategoryName.trim()) return;
+    
+    setIsUpdating(true);
+    try {
+      const newCat = {
+        id: `custom_${Date.now()}`,
+        name: customCategoryName.trim(),
+        icon: 'PieChart',
+        isCustom: true
+      };
+      
+      await updateDoc(familyDocRef, {
+        customCategories: arrayUnion(newCat)
+      });
+      
+      setCustomCategoryName('');
+      toast({ title: "Category Created", description: `"${newCat.name}" added to your family.` });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Failed to add", description: e.message });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   if (isUserLoading || isBudgetLoading || !mounted) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -189,23 +240,33 @@ export default function BudgetManagement() {
           <h1 className="text-2xl font-bold font-headline">Budget Explorer</h1>
           <p className="text-muted-foreground text-sm">Managing family resources.</p>
         </div>
-        <div className="flex items-center gap-1 bg-card border rounded-xl p-1 shadow-sm">
-          <Button variant="ghost" size="icon" onClick={() => navigateMonth(-1)} className="h-8 w-8 rounded-lg">
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <div className="px-2 text-xs font-bold flex items-center gap-1">
-            <Calendar className="h-3 w-3 text-primary" />
-            {monthId}
-          </div>
+        <div className="flex items-center gap-2">
           <Button 
-            variant="ghost" 
+            variant="outline" 
             size="icon" 
-            onClick={() => navigateMonth(1)} 
-            disabled={isCurrentMonth}
-            className="h-8 w-8 rounded-lg"
+            onClick={() => setShowManageCategories(true)} 
+            className="rounded-xl"
           >
-            <ChevronRight className="h-4 w-4" />
+            <Settings2 className="h-4 w-4" />
           </Button>
+          <div className="flex items-center gap-1 bg-card border rounded-xl p-1 shadow-sm">
+            <Button variant="ghost" size="icon" onClick={() => navigateMonth(-1)} className="h-8 w-8 rounded-lg">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="px-2 text-xs font-bold flex items-center gap-1">
+              <Calendar className="h-3 w-3 text-primary" />
+              {monthId}
+            </div>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => navigateMonth(1)} 
+              disabled={isCurrentMonth}
+              className="h-8 w-8 rounded-lg"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -250,12 +311,6 @@ export default function BudgetManagement() {
                   </p>
                 </div>
               </div>
-              
-              {isAdmin && isCurrentMonth && (
-                <Button variant="secondary" size="sm" onClick={apply503020} className="w-full rounded-lg font-bold gap-2">
-                  <Wand2 className="h-4 w-4" /> Suggest 50/30/20 Split
-                </Button>
-              )}
             </CardContent>
           </Card>
 
@@ -263,13 +318,6 @@ export default function BudgetManagement() {
             <div className="p-3 rounded-lg bg-red-100 dark:bg-red-950/30 border border-red-200 dark:border-red-900 flex items-center gap-2 text-red-600 dark:text-red-400 text-xs font-bold animate-pulse">
               <AlertTriangle className="h-4 w-4" />
               ALLOCATIONS EXCEED INCOME!
-            </div>
-          )}
-
-          {isCurrentMonth && remainingIncome > 0 && parseFloat(income) > 0 && (
-            <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 flex items-center gap-2 text-amber-700 dark:text-amber-400 text-xs font-bold">
-              <Info className="h-4 w-4" />
-              UNALLOCATED FUNDS: {currencySymbol}{remainingIncome.toFixed(2)}
             </div>
           )}
 
@@ -284,6 +332,7 @@ export default function BudgetManagement() {
                 const percent = env.allocated > 0 ? (env.spent / env.allocated) * 100 : 0;
                 const isWarning = percent >= 80 && percent < 100;
                 const isOver = percent >= 100;
+                const Icon = ICON_MAP[env.icon] || PieChart;
                 
                 return (
                   <Card key={env.id} className="border-none shadow-sm overflow-hidden group">
@@ -294,10 +343,13 @@ export default function BudgetManagement() {
                             "w-10 h-10 rounded-xl flex items-center justify-center transition-colors",
                             isOver ? "bg-red-100 dark:bg-red-900/40 text-red-600" : isWarning ? "bg-amber-100 dark:bg-amber-900/40 text-amber-600" : "bg-secondary text-primary"
                           )}>
-                            <PieChart className="h-5 w-5" />
+                            <Icon className="h-5 w-5" />
                           </div>
                           <div>
-                            <h4 className="text-sm font-bold">{env.name}</h4>
+                            <h4 className="text-sm font-bold flex items-center gap-2">
+                              {env.name}
+                              {env.isCustom && <Badge variant="secondary" className="h-4 text-[8px] px-1 font-bold">CUSTOM</Badge>}
+                            </h4>
                             <div className="flex items-center gap-2 mt-0.5">
                               <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">
                                 {currencySymbol}{env.spent.toFixed(0)} spent
@@ -328,11 +380,6 @@ export default function BudgetManagement() {
                       </div>
                       
                       <div className="space-y-1">
-                        <div className="flex justify-between items-center text-[10px] font-bold uppercase text-muted-foreground">
-                          <span>{percent.toFixed(0)}%</span>
-                          {isOver && <span className="text-red-500">Alert: Over Budget</span>}
-                          {isWarning && <span className="text-amber-500">Approaching Limit</span>}
-                        </div>
                         <Progress 
                           value={Math.min(percent, 100)} 
                           className={cn(
@@ -345,6 +392,14 @@ export default function BudgetManagement() {
                   </Card>
                 );
               })}
+              
+              {envelopes.length === 0 && (
+                <div className="p-12 text-center bg-secondary/10 border-dashed border-2 rounded-2xl">
+                  <PieChart className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-sm text-muted-foreground font-medium">No active categories.</p>
+                  <Button variant="link" onClick={() => setShowManageCategories(true)} className="text-primary font-bold">Manage Categories</Button>
+                </div>
+              )}
             </div>
           </section>
 
@@ -358,15 +413,84 @@ export default function BudgetManagement() {
               Update Budget
             </Button>
           )}
-
-          {!isCurrentMonth && mounted && !isFutureMonth && (
-            <div className="p-4 rounded-xl bg-secondary/30 flex items-center gap-3 text-sm text-muted-foreground">
-              <Info className="h-5 w-5 text-primary" />
-              You are viewing a historical budget. It cannot be modified.
-            </div>
-          )}
         </>
       )}
+
+      {/* Manage Categories Dialog */}
+      <Dialog open={showManageCategories} onOpenChange={setShowManageCategories}>
+        <DialogContent className="max-w-md max-h-[80vh] flex flex-col rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Family Categories</DialogTitle>
+            <DialogDescription>Select presets or add custom ones for your household.</DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-y-auto pr-2 py-4 space-y-6">
+            <div className="space-y-3">
+              <h4 className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest px-1">Presets</h4>
+              <div className="grid grid-cols-2 gap-2">
+                {PRESET_CATEGORIES.map(cat => {
+                  const isEnabled = !familyData?.disabledCategories?.includes(cat.id);
+                  const Icon = ICON_MAP[cat.icon];
+                  return (
+                    <button
+                      key={cat.id}
+                      onClick={() => toggleCategory(cat.id, true)}
+                      disabled={!isAdmin}
+                      className={cn(
+                        "flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left",
+                        isEnabled ? "border-primary bg-primary/5" : "border-transparent bg-secondary/20"
+                      )}
+                    >
+                      <div className={cn("p-2 rounded-lg", isEnabled ? "bg-primary text-white" : "bg-muted text-muted-foreground")}>
+                        <Icon className="h-4 w-4" />
+                      </div>
+                      <span className={cn("text-xs font-bold", isEnabled ? "text-primary" : "text-muted-foreground")}>{cat.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <h4 className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest px-1">Custom Categories</h4>
+              <div className="space-y-2">
+                {familyData?.customCategories?.map((cat: any) => (
+                  <div key={cat.id} className="flex items-center justify-between p-3 rounded-xl bg-secondary/30">
+                    <div className="flex items-center gap-3">
+                      <PieChart className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-bold">{cat.name}</span>
+                    </div>
+                    <Badge variant="outline" className="text-[8px] font-bold">PRIVATE</Badge>
+                  </div>
+                ))}
+                
+                {isAdmin && (
+                  <div className="flex gap-2 mt-4">
+                    <Input 
+                      placeholder="Custom name..." 
+                      value={customCategoryName}
+                      onChange={(e) => setCustomCategoryName(e.target.value)}
+                      className="rounded-xl"
+                    />
+                    <Button 
+                      size="icon" 
+                      onClick={addCustomCategory} 
+                      disabled={isUpdating || !customCategoryName.trim()}
+                      className="rounded-xl shrink-0"
+                    >
+                      {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button className="w-full rounded-xl" onClick={() => setShowManageCategories(false)}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
